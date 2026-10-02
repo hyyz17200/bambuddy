@@ -796,7 +796,9 @@ def _variant_values(
         "library_file_id": library_file.id,
         "target_model": model,
         "plate_id": spec.plate_id,
-        "ams_mapping": json.dumps(spec.ams_mapping) if spec.ams_mapping else None,
+        # spec.ams_mapping is not stored: a candidate names a model, not a
+        # printer, so there is nothing for its tray ids to refer to. Same rule
+        # as a plain model-based item in add_to_queue.
         "nozzle_mapping": json.dumps(spec.nozzle_mapping) if spec.nozzle_mapping else None,
         "nozzle_rack_choice": json.dumps(spec.nozzle_rack_choice) if spec.nozzle_rack_choice else None,
         "filament_overrides": filament_overrides_json,
@@ -1053,6 +1055,15 @@ async def add_to_queue(
         if not project_result.scalar_one_or_none():
             raise HTTPException(status_code=404, detail="Project not found")
 
+    # A model-based item has no printer yet, and tray ids only mean something
+    # on the printer they were read from: black PETG can be tray 0 on one A1,
+    # tray 3 on the next and the external spool (254) on a third. A mapping
+    # supplied here would be kept by `_ensure_ams_mapping` as already resolved
+    # and sent to whichever printer the scheduler picks. Drop it so the
+    # scheduler computes one against that printer's live trays. Cross-model
+    # candidates are model-based too, and `_variant_values` drops theirs.
+    item_ams_mapping = None if target_model_norm else data.ams_mapping
+
     # Security boundary: the browser's estimated_cost is only a display hint.
     # Budget enforcement and the persisted reservation value must be derived
     # from the server-owned archive/library metadata and spool assignments.
@@ -1078,7 +1089,7 @@ async def add_to_queue(
             archive=archive,
             library_file=library_file,
             plate_id=data.plate_id,
-            ams_mapping=data.ams_mapping,
+            ams_mapping=item_ams_mapping,
             printer_id=data.printer_id,
         )
 
@@ -1090,7 +1101,7 @@ async def add_to_queue(
         quantity=quantity,
     )
 
-    ams_mapping_json = json.dumps(data.ams_mapping) if data.ams_mapping else None
+    ams_mapping_json = json.dumps(item_ams_mapping) if item_ams_mapping else None
     # Same Text-as-JSON convention for the rack-position pick (#1784).
     nozzle_rack_choice_json = json.dumps(data.nozzle_rack_choice) if data.nozzle_rack_choice else None
     # Reprint fallback: the caller didn't specify an explicit ams_mapping (no
@@ -1303,13 +1314,20 @@ async def bulk_update_queue_items(
             continue
 
         item_update_data = update_data.copy()
+        # Moving a job to another printer strands its mapping: the tray ids were
+        # read from the old printer, and `_ensure_ams_mapping` would keep them
+        # as already resolved. This request cannot carry a new mapping, so clear
+        # it and let the scheduler compute one for the new printer. A job that
+        # stays where it is keeps the mapping it has.
+        if "printer_id" in item_update_data and item_update_data["printer_id"] != item.printer_id:
+            item_update_data["ams_mapping"] = None
         if validates_billing_fields:
             trusted_estimated_cost = await _trusted_item_estimated_cost(
                 db,
                 item,
                 printer_id=item_update_data.get("printer_id", item.printer_id),
                 plate_id=item.plate_id,
-                ams_mapping=item.ams_mapping,
+                ams_mapping=item_update_data.get("ams_mapping", item.ams_mapping),
             )
             item_update_data["estimated_cost"] = trusted_estimated_cost
             await validate_print_budget(
@@ -1993,6 +2011,23 @@ async def update_queue_item(
                 400,
                 f"File was sliced for {sliced_for} and cannot be dispatched to {update_data['target_model']} printers",
             )
+
+    # Tray ids only mean something on the printer they were read from, so the
+    # stored mapping must not outlive that printer. Judged on the state the row
+    # ends up in, not on which fields the request happens to carry: the edit
+    # dialog used to omit ams_mapping when switching a job to "any <model>",
+    # which left the old printer's trays on a row the scheduler could then hand
+    # to any printer of that model.
+    if new_target_model and not new_printer_id:
+        # No printer yet. The scheduler computes the mapping once it picks one.
+        update_data["ams_mapping"] = None
+    elif (
+        "printer_id" in update_data
+        and update_data["printer_id"] != item.printer_id
+        and "ams_mapping" not in update_data
+    ):
+        # Moved to another printer (or unassigned) without a mapping for it.
+        update_data["ams_mapping"] = None
 
     # Serialize ams_mapping to JSON for TEXT column storage
     if "ams_mapping" in update_data:

@@ -58,6 +58,8 @@ class QueueVariantCreate(BaseModel):
     library_file_id: int
     target_model: str | None = None
     plate_id: int | None = None
+    # Accepted, not stored. Tray ids belong to one printer and a candidate
+    # names a model; the scheduler maps against the printer it assigns.
     ams_mapping: list[int] | None = None
     nozzle_mapping: list[int] | None = None
     # Which rack position each filament group prints from (#1784), as

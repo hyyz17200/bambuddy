@@ -2665,6 +2665,26 @@ describe('PrintModal — override survives "Any model" -> "Specific Printer" (#3
     ]);
   });
 
+  it('clears the tray mapping when saving an any-model job', async () => {
+    // Tray ids belong to one printer. Leaving the key out of the PATCH kept
+    // whatever the row had, and the scheduler then sent that to whichever
+    // printer of the model it picked.
+    const staleItem = createMockQueueItem({
+      printer_id: null,
+      target_model: 'P2S',
+      ams_mapping: [254],
+    } as Partial<PrintQueueItem>);
+    const user = userEvent.setup();
+    render(<PrintModal mode="edit-queue-item" archiveId={1} archiveName="Job" queueItem={staleItem} onClose={mockOnClose} />);
+
+    await waitFor(() => expect(screen.getByText('Filament Override')).toBeInTheDocument());
+    await submit(user);
+
+    await waitFor(() => expect(patched).toHaveLength(1));
+    expect(patched[0].target_model).toBe('P2S');
+    expect(patched[0]).toHaveProperty('ams_mapping', null);
+  });
+
   it('carries an override picked in model mode into a specific-printer job when creating', async () => {
     const user = userEvent.setup();
     render(<PrintModal mode="create" archiveId={1} archiveName="Job" onClose={mockOnClose} />);

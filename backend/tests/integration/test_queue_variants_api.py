@@ -100,6 +100,35 @@ class TestQueueWithVariants:
 
     @pytest.mark.asyncio
     @pytest.mark.integration
+    async def test_a_candidate_does_not_store_a_supplied_ams_mapping(
+        self, async_client, db_session, sliced_file_factory, printer_factory
+    ):
+        """A candidate names a model, and tray ids only mean something on one
+        printer of it: two H2S machines can hold the same spool in different
+        trays. The scheduler maps against the printer it assigns."""
+        await printer_factory(model="H2S")
+        await printer_factory(model="H2S")
+        await printer_factory(model="H2C")
+        h2s = await sliced_file_factory("H2S", file_path="library/mapping_h2s.gcode.3mf")
+        h2c = await sliced_file_factory("H2C", file_path="library/mapping_h2c.gcode.3mf")
+
+        r = await async_client.post(
+            "/api/v1/queue/",
+            json={
+                "variants": [
+                    {"library_file_id": h2s.id, "ams_mapping": [1]},
+                    {"library_file_id": h2c.id, "ams_mapping": [4, 5]},
+                ]
+            },
+        )
+        assert r.status_code == 200
+        assert r.json()["ams_mapping"] is None
+
+        variants = await _variants_of(db_session, r.json()["id"])
+        assert [v.ams_mapping for v in variants] == [None, None]
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration
     async def test_deleting_one_candidate_leaves_the_job_and_its_sibling(
         self, async_client, db_session, sliced_file_factory, printer_factory
     ):

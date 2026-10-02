@@ -245,6 +245,9 @@ class PrintQueueVariant(Base):
     # Per-file dispatch settings, same semantics as the identically named columns
     # on PrintQueueItem — see there for the formats.
     plate_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # No longer written or dispatched from. Tray ids belong to one printer and
+    # a candidate names a model, so the scheduler computes the mapping for the
+    # printer it assigns. Rows queued before that may still hold a value.
     ams_mapping: Mapped[str | None] = mapped_column(Text, nullable=True)
     nozzle_mapping: Mapped[str | None] = mapped_column(Text, nullable=True)
     nozzle_rack_choice: Mapped[str | None] = mapped_column(Text, nullable=True)

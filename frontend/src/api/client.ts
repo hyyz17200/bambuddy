@@ -2859,7 +2859,7 @@ export interface PrintQueueItemUpdate {
   require_previous_success?: boolean;
   auto_off_after?: boolean;
   manual_start?: boolean;
-  ams_mapping?: number[];
+  ams_mapping?: number[] | null;  // null = clear; the scheduler computes one at dispatch
   plate_id?: number | null;  // Plate ID for multi-plate 3MF files
   // Print options
   bed_levelling?: CalibrationMode;

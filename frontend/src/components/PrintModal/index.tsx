@@ -1313,7 +1313,10 @@ export function PrintModal({
               auto_off_after: scheduleOptions.autoOffAfter,
               gcode_injection: scheduleOptions.gcodeInjection,
               manual_start: scheduleOptions.scheduleType === 'queue' && scheduleOptions.requireManualStart,
-              ams_mapping: undefined,
+              // null, not undefined: tray ids belong to one printer, and
+              // omitting the field left the old printer's mapping on a job
+              // that can now go to any printer of the model.
+              ams_mapping: null,
               plate_id: plateId,
               scheduled_time: scheduleOptions.scheduleType === 'scheduled' && scheduleOptions.scheduledTime
                 ? new Date(scheduleOptions.scheduledTime).toISOString()

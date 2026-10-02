@@ -2185,6 +2185,23 @@ class PrintScheduler:
                                 )
                                 continue
 
+                        # A mapping already on the row was not made for this
+                        # printer: the item had none until a moment ago, and tray
+                        # ids are per-printer (the same spool is tray 0 on one
+                        # machine, tray 3 on the next, external 254 on a third).
+                        # `_ensure_ams_mapping` keeps anything that looks
+                        # resolved, so a leftover would go out as-is and print
+                        # from the wrong feed. The routes no longer store one;
+                        # this covers rows written before they stopped.
+                        #
+                        # Cleared before the printer is written, not after. The
+                        # notification below commits this session once per
+                        # provider, so whatever is set ahead of it can be
+                        # persisted on its own — and a row left holding the new
+                        # printer with the old mapping comes back through the
+                        # fixed-printer branch, which trusts it.
+                        item.ams_mapping = None
+
                         # Assign printer and start - clear waiting reason
                         item.printer_id = printer_id
                         item.waiting_reason = None
@@ -3329,7 +3346,10 @@ class PrintScheduler:
 
         item.target_model = variant.target_model
         item.plate_id = variant.plate_id
-        item.ams_mapping = variant.ams_mapping
+        # No ams_mapping: a candidate names a model, and tray ids only mean
+        # something on one printer of it. The assignment computes the mapping
+        # against the printer that was picked, as it does for any model-based
+        # item.
         item.nozzle_mapping = variant.nozzle_mapping
         item.nozzle_rack_choice = variant.nozzle_rack_choice
         item.filament_overrides = variant.filament_overrides
