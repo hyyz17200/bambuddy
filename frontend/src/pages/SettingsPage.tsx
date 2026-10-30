@@ -2976,7 +2976,7 @@ export function SettingsPage() {
                       </div>
                     ) : (
                       <p className="mt-3 text-sm text-bambu-gray">
-                        {t('hyyz17200.inAppUpdateLocked', 'In-app updates are disabled on this fork. Build and install it manually.')}
+                        {t('hyyz17200.inAppUpdateLocked')}
                       </p>
                     )}
                   </div>
