@@ -813,7 +813,7 @@ export function SettingsPage() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: updateStatus, refetch: refetchUpdateStatus } = useQuery({
+  const { data: updateStatus } = useQuery({
     queryKey: ['updateStatus'],
     queryFn: api.getUpdateStatus,
     refetchInterval: (query) => {
@@ -1071,17 +1071,6 @@ export function SettingsPage() {
         : [...prev.group_ids, groupId],
     }));
   };
-
-  const applyUpdateMutation = useMutation({
-    mutationFn: api.applyUpdate,
-    onSuccess: (data) => {
-      if (data.is_ha_addon || data.is_docker || data.is_windows_installer) {
-        showToast(data.message, 'error');
-      } else {
-        refetchUpdateStatus();
-      }
-    },
-  });
 
   // Test all notification providers
   const [testAllResult, setTestAllResult] = useState<{
@@ -3012,18 +3001,9 @@ export function SettingsPage() {
                         </a>
                       </div>
                     ) : (
-                      <Button
-                        className="mt-3"
-                        onClick={() => applyUpdateMutation.mutate()}
-                        disabled={applyUpdateMutation.isPending}
-                      >
-                        {applyUpdateMutation.isPending ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
-                        {t('settings.installUpdate')}
-                      </Button>
+                      <p className="mt-3 text-sm text-bambu-gray">
+                        {t('hyyz17200.inAppUpdateLocked', 'In-app updates are disabled on this fork. Build and install it manually.')}
+                      </p>
                     )}
                   </div>
                 ) : updateCheck?.error ? (
