@@ -39,6 +39,7 @@ import {
 } from '../utils/sidebarLayout';
 import { ScrollableModalOverlay } from './ScrollableModalOverlay';
 
+import { hyyz17200NavItems } from '../hyyz17200/nav';
 
 interface NavItem {
   id: string;
@@ -67,6 +68,7 @@ export const defaultNavItems: NavItem[] = [
   // intentionally. Do not drop this entry — without it the /notifications page
   // is orphaned (route + page still exist but no nav link) (#1901).
   { id: 'notifications', to: '/notifications', icon: Bell, labelKey: 'nav.notifications' },
+  ...hyyz17200NavItems,
   { id: 'settings', to: '/settings', icon: Settings, labelKey: 'nav.settings' },
 ];
 
