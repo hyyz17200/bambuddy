@@ -16,6 +16,7 @@ import { SpoolBuddyLayout } from './components/spoolbuddy/SpoolBuddyLayout';
 import { PageLoading } from './components/PageLoading';
 import { AuthRetrying } from './components/AuthRetrying';
 import { lazyPage } from './utils/lazyPage';
+import { hyyz17200Routes } from './hyyz17200/routes';
 
 // Every page loads as its own file when first opened (#3175).
 const PrintersPage = lazyPage(() => import('./pages/PrintersPage'), 'PrintersPage');
@@ -276,6 +277,7 @@ function App() {
                   <Route path="gcode-viewer" element={<GCodeViewerPage />} />
                   <Route path="external/:id" element={<ExternalLinkPage />} />
                   <Route path="camera-tokens" element={<Navigate to="/settings?tab=camera#card-camera-tokens" replace />} />
+                  {hyyz17200Routes}
                 </Route>
               </Routes>
               </Suspense>
