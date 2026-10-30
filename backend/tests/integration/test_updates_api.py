@@ -24,7 +24,9 @@ class TestUpdatesAPI:
         from backend.app.api.routes import updates as updates_module
 
         updates_module._update_status = {"status": "idle", "progress": 0, "message": "", "error": None}
-        yield
+        # hyyz17200: these tests cover upstream's apply flow behind the fork's lock.
+        with patch.object(updates_module, "HYYZ17200_IN_APP_UPDATE_LOCKED", False):
+            yield
 
     @pytest.mark.asyncio
     async def test_get_version(self, async_client: AsyncClient):

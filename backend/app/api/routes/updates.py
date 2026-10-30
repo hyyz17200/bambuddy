@@ -33,6 +33,9 @@ router = APIRouter(prefix="/updates", tags=["updates"])
 GIT_STEP_TIMEOUT_SECONDS = 300
 INSTALL_STEP_TIMEOUT_SECONDS = 900
 TERMINATE_GRACE_SECONDS = 5
+# hyyz17200: this fork is built and installed by hand. The updater would reset
+# the checkout to an upstream release tag and repoint origin at upstream.
+HYYZ17200_IN_APP_UPDATE_LOCKED = True
 
 
 class _StepTimedOut(Exception):
@@ -1052,6 +1055,12 @@ async def apply_update(
                 "Windows installations are updated by re-running the installer. "
                 "Download the latest installer from the Bambuddy releases page."
             ),
+        }
+
+    if HYYZ17200_IN_APP_UPDATE_LOCKED:
+        return {
+            "success": False,
+            "message": "In-app updates are disabled on this fork. Build and install it manually.",
         }
 
     # Discover which release tag to install. Resolved here (where we have

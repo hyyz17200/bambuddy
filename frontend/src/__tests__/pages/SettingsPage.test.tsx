@@ -748,6 +748,24 @@ describe('SettingsPage', () => {
       expect(screen.queryByText(/Home Assistant Supervisor/i)).not.toBeInTheDocument();
       expect(screen.queryByText('docker compose pull && docker compose up -d')).not.toBeInTheDocument();
     });
+
+    it('hyyz17200: a git install gets the manual-build note, not the install button', async () => {
+      await renderWithUpdateCheck({
+        update_available: true,
+        current_version: '0.2.4',
+        latest_version: '0.2.5',
+        release_name: '0.2.5',
+        release_notes: '',
+        release_url: 'https://example.invalid/r',
+        published_at: '2099-01-01T00:00:00Z',
+        is_docker: false,
+        is_ha_addon: false,
+        update_method: 'git',
+      });
+
+      expect(await screen.findByText(/In-app updates are disabled on this fork/)).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /install update/i })).not.toBeInTheDocument();
+    });
   });
 
   describe('tabs navigation', () => {
