@@ -610,6 +610,8 @@ async def _repair_sqlite_orphans(conn) -> None:
 
 async def init_db():
     # Import models to register them with SQLAlchemy
+    from backend.app.hyyz17200 import models as hyyz17200_models  # noqa: F401
+    from backend.app.hyyz17200.migrations import run_migrations as run_hyyz17200_migrations
     from backend.app.models import (  # noqa: F401
         active_print_session,
         active_print_spoolman,
@@ -681,6 +683,7 @@ async def init_db():
 
         # Run migrations for new columns (SQLite doesn't auto-add columns)
         await run_migrations(conn)
+        await run_hyyz17200_migrations(conn)
         # Before the orphan repair, so ids its rows still point at count.
         await _migrate_sqlite_autoincrement(conn)
         await _raise_postgres_id_sequences(conn)

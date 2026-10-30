@@ -2,6 +2,7 @@ import i18n, { type BackendModule, type ResourceLanguage } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
 import { recoverFromMissingChunk } from '../utils/lazyPage';
+import { withHyyz17200Locale } from '../hyyz17200/locales';
 
 // English is bundled: it is the fallback for every missing key. The other
 // languages are separate files, and only the one in use is loaded (#3175).
@@ -37,7 +38,7 @@ export const localeBackend: BackendModule = {
       return;
     }
     load().then(
-      (module) => callback(null, module.default),
+      (module) => callback(null, withHyyz17200Locale(language, module.default)),
       (error) => {
         // A tab from before an update asks for a file the update deleted.
         void recoverFromMissingChunk().then((reloading) => {
@@ -57,7 +58,7 @@ export const i18nReady = i18n
   .use(LanguageDetector)
   .use(initReactI18next)
   .init({
-    resources: { en: { translation: en } },
+    resources: { en: { translation: withHyyz17200Locale('en', en) } },
     // Load every other language through localeBackend.
     partialBundledLanguages: true,
     fallbackLng: 'en',
