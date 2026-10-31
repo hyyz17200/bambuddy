@@ -7,6 +7,7 @@ import { X, AlertTriangle, AlertCircle, Info, ExternalLink, Loader2, Trash2 } fr
 import type { HMSError, Permission } from '../api/client';
 import { api } from '../api/client';
 import { useToast } from '../contexts/ToastContext';
+import { isHiddenFault } from '../hyyz17200/hiddenFaults';
 
 interface HMSErrorModalProps {
   printerName: string;
@@ -84,6 +85,7 @@ function getDisplayCode(error: HMSError): string {
 // Same rule as the backend's _hms_fault_counts, which decides notifications and
 // the MQTT relay.
 function counts(error: HMSError): boolean {
+  if (isHiddenFault(error)) return false;
   if (!(error.severity >= 1)) return false;
   if ((error.actions?.length ?? 0) > 0) return true;
   const isHmsNotice = error.full_code?.length === 16 && error.severity === 3;
