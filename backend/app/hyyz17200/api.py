@@ -1,15 +1,17 @@
 """The fork's API routes, all under /hyyz17200."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.auth import RequirePermissionIfAuthEnabled
+from backend.app.core.auth import RequireCameraStreamTokenIfAuthEnabled, RequirePermissionIfAuthEnabled, StreamOpener
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
+from backend.app.hyyz17200 import camera_frames
 from backend.app.hyyz17200.hms_filter import load_hidden_codes, normalize_code
 from backend.app.hyyz17200.models.hidden_fault import HiddenFault
+from backend.app.models.printer import Printer
 from backend.app.models.user import User
 
 router = APIRouter(prefix="/hyyz17200", tags=["hyyz17200"])
@@ -38,6 +40,35 @@ async def get_fork_info(
 ):
     """Tells a running instance apart from a plain upstream build."""
     return {"fork": "hyyz17200"}
+
+
+# "/camera/snapshot" in the path is what lets a request with only a ?token= past
+# the auth middleware (PUBLIC_API_PATTERNS matches by substring). The token
+# dependency here does the checking, including which printers the token may open.
+@router.get("/printers/{printer_id}/camera/snapshot-cached")
+async def get_cached_camera_frame(
+    printer_id: int,
+    interval: int = Query(default=30, ge=2, le=300),
+    if_none_match: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: StreamOpener = RequireCameraStreamTokenIfAuthEnabled,
+):
+    """The last good frame, at once: 204 until there is one, 304 if it has not changed.
+
+    ``interval`` is how many seconds old a frame may get before another capture.
+    """
+    if await db.scalar(select(Printer.id).where(Printer.id == printer_id)) is None:
+        camera_frames.forget(printer_id)
+        raise HTTPException(status_code=404, detail="Printer not found")
+
+    read = camera_frames.read_frame(printer_id, interval)
+    headers = {"Cache-Control": "no-store", "X-Hyyz17200-Capture-Failures": str(read.failures)}
+    if read.frame is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT, headers=headers)
+    headers |= {"ETag": read.etag, "X-Hyyz17200-Frame-Age": str(read.age_seconds)}
+    if if_none_match == read.etag:
+        return Response(status_code=status.HTTP_304_NOT_MODIFIED, headers=headers)
+    return Response(content=read.frame, media_type="image/jpeg", headers=headers)
 
 
 @router.get("/hidden-faults", response_model=list[HiddenFaultResponse])
