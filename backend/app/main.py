@@ -105,6 +105,7 @@ from backend.app.core.static_assets import AssetStaticFiles
 from backend.app.core.tasks import spawn_background_task
 from backend.app.core.websocket import ws_manager
 from backend.app.hyyz17200 import register as register_hyyz17200
+from backend.app.hyyz17200.hms_filter import visible_faults as hyyz17200_visible_faults
 from backend.app.services import kprofile_drift, pause_eta, print_dispatch_context, slot_unlink_grace
 from backend.app.services.ams_assignment_lock import get_ams_assignment_lock
 from backend.app.services.archive import ArchiveService, peek_plate_index_in_3mf, swap_plate_suffix
@@ -2440,6 +2441,7 @@ async def on_printer_status_change(printer_id: int, state: PrinterState):
     current_hms_errors = getattr(state, "hms_errors", []) or []
     if current_hms_errors:
         new_errors = _take_new_hms_faults(printer_id, current_hms_errors, state.state)
+        new_errors = hyyz17200_visible_faults(new_errors)
 
         if new_errors:
             try:

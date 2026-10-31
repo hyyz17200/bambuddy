@@ -65,6 +65,8 @@ git push --force-with-lease origin hyyz17200
 - `load_all_models()` 只扫描 `backend/app/models/`，自己的测试要显式导入模型。
 - SQLite 下外键约束是关闭的，删除不会级联，关联上游表的数据要自己清理孤儿记录。
 - 新接口必须带鉴权依赖（`RequirePermissionIfAuthEnabled`），否则 `test_route_auth_coverage.py` 会失败。
+- 新接口用 `Depends(get_db, scope="function")`，否则 `test_get_db_function_scope.py` 会失败。
+- `SettingsPage.test.tsx` 写死了上游的侧边栏顺序，所以在该文件里 mock 掉了 `hyyz17200/nav`，新增导航项不用改它。
 - `backend/tests/integration/test_hyyz17200_mounts.py` 和 `frontend/src/__tests__/hyyz17200/mounts.test.ts` 负责发现 rebase 后断开的挂载点。
 
 ## 部署
@@ -100,8 +102,25 @@ git push --force-with-lease origin hyyz17200
 | `[fix] Lock the in-app updater on this fork` | `POST /updates/apply` 拒绝更新，设置页不显示安装按钮；检查更新保留 | `updates.py`、`SettingsPage.tsx`、`test_updates_api.py` |
 | `[docs] Fork patch architecture rule` | 本文件 | 无 |
 | `[infra] Fork mount points` | 上表的挂载点和 `hyyz17200` 目录骨架，含 `GET /api/v1/hyyz17200/info` | 上表 5 个文件、`SettingsPage.tsx` |
+| `[feat] Hide chosen fault codes` | 上游 #3269。设置页维护隐藏码，被隐藏的故障不计入角标、不发提醒 | `main.py`、`notify_live_activities.py`、`App.tsx`、`HMSErrorModal.tsx`、`SettingsPage.test.tsx` |
 
 新增或删除补丁时更新此表。
+
+### 隐藏故障码
+
+只在“提醒”这一层隐藏，`PrinterState.hms_errors`、API、WebSocket、调度和失败原因始终能看到全部故障。上游文件各只有一处连接点：
+
+| 上游文件 | 作用 |
+|---|---|
+| `main.py` 状态回调，`_take_new_hms_faults` 之后 | 过滤推送通知和 MQTT relay 告警（`main.py` “只放挂载代码”的特批例外：这里之后的代码拿不到 `full_code`）。必须放在去重之后，否则取消隐藏时仍在的故障会重新告警 |
+| `notify_live_activities.py` 的 `_printer_fault` | Live Activity 不显示被隐藏的故障 |
+| `HMSErrorModal.tsx` 的 `counts()` | 角标、红点、摄像头墙、批量工具栏都走这里；故障仍折叠显示在弹窗中，“清除错误”按钮保留 |
+| `App.tsx` 的 `<HiddenFaultsSync />` | 加载隐藏列表。挂在 `App` 而不是 `Layout`，因为 `/camwall` 不在 `Layout` 内 |
+
+- 匹配规则在 `hms_filter.py` 和 `hiddenFaults.ts` 各有一份，改动时要同步。
+- 默认不隐藏任何码。BMCU 预设不含 `print_error`，`0500_4004` 这类真实的打印错误只能手动添加。
+- 不支持免登录的 kiosk 摄像头墙（`?token=`）：启用鉴权时它拿不到列表，仍显示全部故障。
+- 上游如果实现了 #3269，删掉这个补丁，改用上游的方案。
 
 ### 为什么要锁一键更新
 

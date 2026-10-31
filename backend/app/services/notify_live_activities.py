@@ -18,6 +18,7 @@ import httpx
 from sqlalchemy import delete, select, update
 
 from backend.app.core.database import async_session
+from backend.app.hyyz17200.hms_filter import visible_faults as hyyz17200_visible_faults
 from backend.app.models.notification import NotificationProvider
 from backend.app.models.notification_live_activity import NotificationLiveActivity
 from backend.app.models.printer import Printer
@@ -73,7 +74,7 @@ def _printer_fault(state) -> str | None:
     HMS notices without actions (for example an open cover) are informational;
     eight-digit task-stopping print_error prompts at that level still count.
     """
-    for error in getattr(state, "hms_errors", None) or []:
+    for error in hyyz17200_visible_faults(getattr(state, "hms_errors", None)):
         severity = getattr(error, "severity", 0)
         description = str(getattr(error, "description", "") or "")
         actions = bool(getattr(error, "actions", None))
