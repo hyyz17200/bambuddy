@@ -17,6 +17,10 @@ import { server } from '../mocks/server';
 import { SIDEBAR_HIDDEN_SYSTEM_ITEMS_KEY, SIDEBAR_ORDER_KEY } from '../../utils/sidebarLayout';
 import { setAuthToken } from '../../api/client';
 
+// hyyz17200: these tests pin upstream's exact sidebar order. The fork's entries
+// are covered by __tests__/hyyz17200/hiddenFaults.test.tsx.
+vi.mock('../../hyyz17200/nav', () => ({ hyyz17200NavItems: [] }));
+
 const mockSettings = {
   auto_archive: true,
   save_thumbnails: true,
