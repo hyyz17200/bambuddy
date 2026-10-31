@@ -5,6 +5,10 @@ import type { ResourceLanguage } from 'i18next';
 const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
   en: {
     inAppUpdateLocked: 'In-app updates are disabled on this fork. Build and install it manually.',
+    camWall: {
+      frameAge: '{{time}} ago',
+      maxLiveZero: '0 keeps every tile on snapshots.',
+    },
     hiddenFaults: {
       nav: 'Hidden Faults',
       title: 'Hidden Faults',
@@ -24,6 +28,10 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
   },
   'zh-CN': {
     inAppUpdateLocked: '此 fork 已禁用应用内更新，请手动构建安装。',
+    camWall: {
+      frameAge: '{{time}}前',
+      maxLiveZero: '设为 0 时所有单元都使用快照。',
+    },
     hiddenFaults: {
       nav: '隐藏故障',
       title: '隐藏故障',
