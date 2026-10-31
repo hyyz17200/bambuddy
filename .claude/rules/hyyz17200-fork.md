@@ -75,6 +75,38 @@ git push --force-with-lease origin hyyz17200
 
 本地和 `Dockerfile` 的 Node 版本不同时以 Docker 构建结果为准（镜像用 Node 22）。`lazyPage.test.tsx` 的 sessionStorage 用例在 Node 26 下失败、Node 22 下通过，与补丁无关。
 
+### 构建 Windows 安装包
+
+用户实际用这种方式部署。上游 Release 里的安装包不含补丁，必须从 `hyyz17200` 本地构建。需要 Python 3.11+、Node 22、Inno Setup 6（`C:\Program Files (x86)\Inno Setup 6\ISCC.exe`）。
+
+先确认工作区干净、当前在 `hyyz17200`，然后在仓库根目录用 Git Bash 运行：
+
+```bash
+V=$(grep -m1 '^APP_VERSION' backend/app/core/config.py | sed -E 's/.*"([^"]+)".*/\1/')
+TAG="v$V-hyyz17200.$(date +%Y%m%d)"     # 当天再次构建时加 .2、.3
+cd installers/windows
+PYTHONUTF8=1 GITHUB_REF="refs/tags/$TAG" python build.py
+"/c/Program Files (x86)/Inno Setup 6/ISCC.exe" bambuddy.iss
+cd ../..
+git restore static && git clean -fd static   # 构建成功或失败都要还原
+```
+
+产物在 `installers/windows/build/output/bambuddy-<版本>-windows-x64-setup.exe`，`build/` 已被忽略。
+
+- **`PYTHONUTF8=1` 不能省**：中文 Windows 默认用 GBK 读源码，`build.py` 读 `APP_VERSION` 时会报 `UnicodeDecodeError`。
+- **每次构建用新版本号**：`GITHUB_REF` 决定文件名和安装器版本，只影响安装包，应用内仍显示 `APP_VERSION`。同名文件会被覆盖，新旧包也分不清。
+- `build.py` 会运行 `npm ci`，重装 `frontend/node_modules`，并把前端构建到 `static/`。
+- 首次构建要下载内嵌 Python、依赖和 ffmpeg，缓存在 `build/downloads`；重新编译 `.iss` 约需 3 分钟。
+
+交付前检查，不用真的安装：
+
+1. `build/staging/VERSION` 是预期版本，`build/staging/app/static/assets` 里能 grep 到本次前端改动。
+2. 用打包的 Python 启动一次，`DATA_DIR` 指向临时目录。在 `build/staging/app` 下运行 `../python/python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 18001 --loop asyncio`。
+3. `GET /api/v1/hyyz17200/info` 返回 `{"fork":"hyyz17200"}`，`POST /api/v1/updates/apply` 不会执行更新（Windows 版返回 `success: false`）。
+4. 停掉测试进程，确认 `git status` 干净。
+
+安装和服务注册只能在真正运行 `.exe` 后验证。安装包没有签名，SmartScreen 拦截时选“更多信息 → 仍要运行”。覆盖安装会保留 `C:\ProgramData\Bambuddy\` 下的数据。
+
 ## 在 Windows 上验证后端
 
 这台 Windows 机器上全量测试本来就有约 200 项失败或错误，所以判断补丁有没有问题时，要在**同一个盘**上和 `dev` 对比失败清单（测试路径校验与盘符有关，跨盘对比会多出一批假差异）。
@@ -105,6 +137,7 @@ git push --force-with-lease origin hyyz17200
 | `[feat] Hide chosen fault codes` | 上游 #3269。设置页维护隐藏码，被隐藏的故障不计入角标、不发提醒 | `main.py`、`notify_live_activities.py`、`App.tsx`、`HMSErrorModal.tsx`、`SettingsPage.test.tsx` |
 | `[feat] Cam wall frame cache` | 后端缓存每台打印机最后一帧好画面，请求立刻返回，后台按需抓帧 | 无 |
 | `[feat] Cam wall keeps the last frame` | 摄像头墙失败时保留上一帧，不再黑屏；实时路数可设为 0 | `CameraTile.tsx`、`CameraWall.tsx`、`CamWallPage.tsx`、`PrintersPage.tsx`、`CameraTile.test.tsx` |
+| `[docs] Windows installer build steps` | 本文件的安装包构建步骤 | 无 |
 
 新增或删除补丁时更新此表。
 
