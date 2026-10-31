@@ -37,7 +37,7 @@ const KIOSK_POLL_MS = 5000;
 
 const DEFAULT_MAX_LIVE = 4;
 const DEFAULT_SNAPSHOT_SEC = 8;
-const MIN_MAX_LIVE = 1;
+const MIN_MAX_LIVE = 0; // hyyz17200: 0 keeps every tile on snapshots
 const MAX_MAX_LIVE = 16;
 const MIN_SNAPSHOT_SEC = 2;
 const MAX_SNAPSHOT_SEC = 60;

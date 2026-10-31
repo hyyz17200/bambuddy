@@ -103,8 +103,21 @@ git push --force-with-lease origin hyyz17200
 | `[docs] Fork patch architecture rule` | 本文件 | 无 |
 | `[infra] Fork mount points` | 上表的挂载点和 `hyyz17200` 目录骨架，含 `GET /api/v1/hyyz17200/info` | 上表 5 个文件、`SettingsPage.tsx` |
 | `[feat] Hide chosen fault codes` | 上游 #3269。设置页维护隐藏码，被隐藏的故障不计入角标、不发提醒 | `main.py`、`notify_live_activities.py`、`App.tsx`、`HMSErrorModal.tsx`、`SettingsPage.test.tsx` |
+| `[feat] Cam wall frame cache` | 后端缓存每台打印机最后一帧好画面，请求立刻返回，后台按需抓帧 | 无 |
+| `[feat] Cam wall keeps the last frame` | 摄像头墙失败时保留上一帧，不再黑屏；实时路数可设为 0 | `CameraTile.tsx`、`CameraWall.tsx`、`CamWallPage.tsx`、`PrintersPage.tsx`、`CameraTile.test.tsx` |
 
 新增或删除补丁时更新此表。
+
+### 摄像头墙保留上一帧
+
+上游的快照单元每次刷新都重建 `<img>`，加载期间和失败后都是黑屏，连续失败两次后还会停在“无信号”。现在单元用 `fetch` 取帧，解码成功才替换画面。
+
+- 接口：`GET /api/v1/hyyz17200/printers/{id}/camera/snapshot-cached?interval=秒`。路径必须包含 `/camera/snapshot`：鉴权中间件和 `sw.js` 都按这个子串放行，真正的校验在路由的 token 依赖里。
+- 后端（`camera_frames.py`）：抓帧走上游的 `camera_snapshot()`，所以有实时流时复用它的帧，不开第二个连接。同一台打印机一次一个抓帧，全局最多 2 个并发，连续失败时间隔翻倍（上限 120 秒），1 小时没人读就丢弃缓存。只有墙用这个缓存：完成照片、热床检测要现拍的帧，不能走这里。
+- 前端（`useWallFrame.ts`）：一次只发一个请求，失败不影响画面，页面隐藏时停止轮询。只有 401 才刷新 token。最后一帧放在实时流下层，旧帧超过“两个刷新间隔 + 20 秒”时显示年龄角标。
+- 实时单元：流出现首帧后（或等 15 秒后）才开始取帧，避免和正在建立的流抢打印机唯一的连接。流失败后退回快照，至少 1 分钟后且抓到新帧才重开。流失败仍是 DOM 上的 `<img>` 出错，启用鉴权时会触发全页重新签发 token，这一点没有改。
+- rebase 时如果上游改了 `CameraTile.tsx` 的快照逻辑，优先保留这里的取帧方式；`camera_snapshot` 的签名变了，`test_hyyz17200_camera_frames.py` 会失败。
+- 上游如果解决了黑屏，删掉这两个补丁，改用上游的方案。
 
 ### 隐藏故障码
 

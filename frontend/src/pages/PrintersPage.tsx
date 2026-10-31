@@ -8855,7 +8855,7 @@ export function PrintersPage() {
   // live count lower than a NUC; default 4 is the documented Pi 4 ceiling).
   const [camWallMaxLive, setCamWallMaxLive] = useState<number>(() => {
     const saved = parseInt(localStorage.getItem('camWallMaxLive') || '', 10);
-    return Number.isFinite(saved) && saved > 0 ? saved : 4;
+    return Number.isFinite(saved) && saved >= 0 ? saved : 4; // hyyz17200: 0 keeps every tile on snapshots
   });
   const [camWallSnapshotSec, setCamWallSnapshotSec] = useState<number>(() => {
     const saved = parseInt(localStorage.getItem('camWallSnapshotSec') || '', 10);
