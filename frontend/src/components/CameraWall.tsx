@@ -55,7 +55,8 @@ interface CameraWallProps {
   tileSize?: number;
 }
 
-const MIN_MAX_LIVE = 1;
+// hyyz17200: 0 keeps every tile on snapshots, leaving the browser's connections free.
+const MIN_MAX_LIVE = 0;
 const MAX_MAX_LIVE = 16;
 const MIN_SNAPSHOT_SEC = 2;
 const MAX_SNAPSHOT_SEC = 60;
@@ -215,7 +216,7 @@ export function CameraWall({
                   className="w-full rounded-md border border-bambu-dark-tertiary bg-bambu-dark px-2 py-1 text-sm text-white"
                 />
                 <span className="block text-[11px] text-bambu-gray">
-                  {t('printers.camWall.settings.maxLiveHint')}
+                  {t('printers.camWall.settings.maxLiveHint')} {t('hyyz17200.camWall.maxLiveZero')}
                 </span>
               </label>
               <label className="block space-y-1">
