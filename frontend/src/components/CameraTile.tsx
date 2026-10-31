@@ -6,6 +6,7 @@ import { formatDuration } from '../utils/date';
 import { useStreamImgRef } from '../hooks/useStreamImgRef';
 import { useCameraViewerId } from '../hooks/useCameraViewerId';
 import { isSideways, useSidewaysBox } from '../hooks/useSidewaysBox';
+import { formatFrameAge, useWallFrame } from '../hyyz17200/useWallFrame';
 
 export type CameraTileMode = 'live' | 'snapshot' | 'paused';
 export type CameraTileStatusMode = 'off' | 'compact' | 'full';
@@ -43,6 +44,16 @@ const RENEWAL_RETRY_MS = 5_000;
 // A renewal with no frame by then has failed too: a snapshot camera that is
 // down keeps its stream open without one, and the img fires no event at all.
 const RENEWAL_FIRST_FRAME_MS = 15_000;
+// hyyz17200: a live stream gets this long to show a frame before the tile also asks
+// for the cached frame. Sooner could open a second camera connection beside the
+// one the stream is still opening.
+const LIVE_FRAME_WAIT_MS = 15_000;
+// hyyz17200: a stream that failed is tried again once a capture has worked since,
+// no sooner than this. Each failed attempt re-mints the page's stream token.
+const LIVE_RETRY_MS = 60_000;
+// hyyz17200: a frame older than two capture intervals plus a capture's own time
+// gets an age badge, so an old picture is not taken for a current one.
+const STALE_MARGIN_MS = 20_000;
 
 type StatusBucket = 'printing' | 'paused' | 'finished' | 'error' | 'idle';
 
@@ -103,11 +114,6 @@ export function CameraTile({
   // 'renewed': the current img is a renewal not yet showing a frame; 'retried':
   // it is the one retry of a renewal that failed.
   const renewalRef = useRef<'none' | 'renewed' | 'retried'>('none');
-  // A failed snapshot is retried once at the next refresh: the server answers
-  // 503 while a live view of this printer is still starting (it will not take
-  // the camera from that viewer). Not more: each failed camera img re-mints the
-  // page's stream token.
-  const snapshotRetriedRef = useRef(false);
   const renewalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFrameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -129,7 +135,6 @@ export function CameraTile({
       }).catch(() => {});
     }
     setErrored(false);
-    snapshotRetriedRef.current = false;
     setBust((b) => b + 1);
   }, [mode, printerId, viewerId]);
 
@@ -148,19 +153,13 @@ export function CameraTile({
     };
   }, [printerId, viewerId]);
 
-  useEffect(() => {
-    if (mode !== 'snapshot') return;
-    const interval = setInterval(() => setBust((b) => b + 1), snapshotIntervalMs);
-    return () => clearInterval(interval);
-  }, [mode, snapshotIntervalMs]);
-
   // A stream the server ended (its re-check, the camera dropping) fires no img
   // event: the tile would keep its last frame. Renew it, closing the old
   // connection first (a detached img keeps it open). No /camera/stop: other
   // viewers of the printer share the stream. Not in a hidden page, where the
-  // stream token is not refreshed. A tile showing no signal is left alone:
-  // each failed camera img makes the app re-mint the stream token and
-  // reconnect every camera on the page.
+  // stream token is not refreshed. A failed stream is not retried right away
+  // (hyyz17200: see LIVE_RETRY_MS): each failed camera img makes the app re-mint
+  // the stream token and reconnect every camera on the page.
   //
   // Built once: they only use refs and state setters, and call each other.
   const { clearFirstFrameTimer, streamFailed, reopenAfter } = useMemo(() => {
@@ -227,9 +226,42 @@ export function CameraTile({
   const liveUrl = withStreamToken(
     `/api/v1/printers/${printerId}/camera/stream?fps=${LIVE_FPS}&t=${bust}&viewer=${viewerId}`,
   );
-  const snapshotUrl = withStreamToken(
-    `/api/v1/printers/${printerId}/camera/snapshot?t=${bust}`,
+
+  // hyyz17200: the last good frame stays on screen under everything. Snapshot tiles
+  // show nothing else, and a live tile falls back to it when its stream closes.
+  const streaming = mode === 'live' && !errored;
+  const streamKey = `${mode}-${bust}`;
+  const [shownStreamKey, setShownStreamKey] = useState<string | null>(null);
+  const [waitedStreamKey, setWaitedStreamKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!streaming) return;
+    const timer = setTimeout(() => setWaitedStreamKey(streamKey), LIVE_FRAME_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [streaming, streamKey]);
+  const frame = useWallFrame(
+    printerId,
+    snapshotIntervalMs,
+    connected &&
+      (mode === 'snapshot' ||
+        (mode === 'live' && (errored || shownStreamKey === streamKey || waitedStreamKey === streamKey))),
   );
+  const framesAtFailureRef = useRef<{ at: number; received: number } | null>(null);
+  useEffect(() => {
+    if (mode !== 'live' || !errored) {
+      framesAtFailureRef.current = null;
+      return;
+    }
+    const failure = framesAtFailureRef.current;
+    if (!failure) {
+      framesAtFailureRef.current = { at: Date.now(), received: frame.received };
+    } else if (frame.received > failure.received && Date.now() - failure.at >= LIVE_RETRY_MS) {
+      setErrored(false);
+      setBust((b) => b + 1);
+    }
+  }, [mode, errored, frame.received]);
+  const frameAgeMs = frame.capturedAt === null ? 0 : Date.now() - frame.capturedAt;
+  const frameStale =
+    connected && mode !== 'paused' && !streaming && frameAgeMs > 2 * snapshotIntervalMs + STALE_MARGIN_MS;
 
   // A kiosk wall passes no onClick — there is no pointer at a TV, and the page
   // is authenticated by a token that cannot open the single-camera view. Render
@@ -275,6 +307,15 @@ export function CameraTile({
 
   const content = (
     <>
+      {frame.url && (
+        <img
+          src={frame.url}
+          alt={streaming ? '' : printerName}
+          draggable={false}
+          className="absolute inset-0 h-full w-full select-none object-contain"
+          style={imgStyle}
+        />
+      )}
       {!connected || mode === 'paused' ? (
         <div className="absolute inset-0 flex items-center justify-center bg-bambu-dark/60">
           {connected ? (
@@ -283,36 +324,40 @@ export function CameraTile({
             <WifiOff className="h-8 w-8 text-bambu-gray/70" aria-hidden="true" />
           )}
         </div>
-      ) : errored ? (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/80 text-bambu-gray">
-          <VideoOff className="h-7 w-7" aria-hidden="true" />
-          <span className="text-xs">{t('printers.camWall.noSignal')}</span>
-        </div>
-      ) : (
+      ) : streaming ? (
         <img
           ref={attachImg}
-          key={`${mode}-${bust}`}
-          src={reopening ? undefined : mode === 'live' ? liveUrl : snapshotUrl}
+          key={streamKey}
+          src={reopening ? undefined : liveUrl}
           alt={printerName}
           draggable={false}
           loading="lazy"
-          className="h-full w-full select-none object-contain"
+          className={`relative h-full w-full select-none object-contain ${
+            shownStreamKey === streamKey ? '' : 'opacity-0'
+          }`}
           style={imgStyle}
           onLoad={() => {
             clearFirstFrameTimer();
             renewalRef.current = 'none';
-            snapshotRetriedRef.current = false;
+            setShownStreamKey(streamKey);
           }}
           onError={(e) => {
             // An img with an empty or missing src is closed, not failed.
             if (!e.currentTarget.getAttribute('src')) return;
-            if (mode === 'snapshot' && !snapshotRetriedRef.current) {
-              snapshotRetriedRef.current = true;
-              return;
-            }
             streamFailed();
           }}
         />
+      ) : !frame.url && (errored || frame.noSignal) ? (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/80 text-bambu-gray">
+          <VideoOff className="h-7 w-7" aria-hidden="true" />
+          <span className="text-xs">{t('printers.camWall.noSignal')}</span>
+        </div>
+      ) : null}
+
+      {frameStale && (
+        <span className="absolute right-2 top-8 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400">
+          {t('hyyz17200.camWall.frameAge', { time: formatFrameAge(frameAgeMs / 1000) })}
+        </span>
       )}
 
       {/* Status chip (top-left) */}
@@ -333,16 +378,16 @@ export function CameraTile({
       {/* Mode indicator (top-right) */}
       <span
         className={`absolute right-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-          mode === 'live'
+          streaming
             ? 'bg-red-500/80 text-white'
-            : mode === 'snapshot'
+            : mode !== 'paused'
               ? 'bg-amber-500/70 text-black'
               : 'bg-bambu-dark-tertiary/70 text-bambu-gray'
         }`}
       >
-        {mode === 'live'
+        {streaming
           ? t('printers.camWall.live')
-          : mode === 'snapshot'
+          : mode !== 'paused'
             ? t('printers.camWall.snap')
             : t('printers.camWall.off')}
       </span>
