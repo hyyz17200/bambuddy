@@ -1,0 +1,100 @@
+name: Fork Docker Prerelease
+
+# Builds the fork's Docker image, smoke-tests it, pushes it to GHCR and publishes
+# a GitHub prerelease. Nothing is published unless the smoke test passes.
+#
+# Trigger: push a tag named hyyz17200-v<version>.<date>, e.g.
+#   git tag hyyz17200-v1.3.1b1.20261102 && git push origin hyyz17200-v1.3.1b1.20261102
+#
+# The tag must not start with "v": upstream's windows-installer.yml runs on v* and
+# would fail waiting on signing secrets this fork does not have. A tag trigger is
+# used because workflow_dispatch needs the file on the default branch, and dev is
+# a pure upstream mirror. See .claude/rules/hyyz17200-fork.md.
+
+on:
+  push:
+    tags:
+      - 'hyyz17200-v*'
+
+permissions:
+  contents: write # create the release
+  packages: write # push to ghcr.io
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build image
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${TAG}" \
+            -t "${IMAGE}:${TAG}" -t "${IMAGE}:hyyz17200" .
+
+      - name: Smoke test
+        run: |
+          docker run -d --name smoke -p 18000:8000 "${IMAGE}:${TAG}"
+
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:18000/health >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "${ready:-}" ]; then
+            echo "::error::the app did not become healthy"
+            exit 1
+          fi
+
+          # The fork's routes are mounted.
+          curl -fsS http://localhost:18000/api/v1/hyyz17200/info | jq -e '.fork == "hyyz17200"'
+
+          # The in-app updater refuses to run.
+          curl -fsS -X POST http://localhost:18000/api/v1/updates/apply | jq -e '.success == false'
+
+          # The frontend was built from the patched source.
+          docker exec smoke grep -rlq 'snapshot-cached' /app/static/assets
+
+      - name: Container logs
+        if: failure()
+        run: docker logs smoke || true
+
+      - name: Push image
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+          docker push "${IMAGE}:${TAG}"
+          docker push "${IMAGE}:hyyz17200"
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          Docker image for linux/amd64, built from \`${GITHUB_SHA}\`.
+
+          \`\`\`
+          ${IMAGE}:${TAG}
+          \`\`\`
+
+          \`${IMAGE}:hyyz17200\` always points to the newest prerelease.
+
+          Back up the data before updating: database migrations only run forward.
+          EOF
+
+          gh release create "${TAG}" \
+            --verify-tag \
+            --prerelease \
+            --latest=false \
+            --title "${TAG}" \
+            --notes-file notes.md

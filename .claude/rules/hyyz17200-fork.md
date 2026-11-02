@@ -71,7 +71,7 @@ git push --force-with-lease origin hyyz17200
 
 ## 部署
 
-用户手动构建安装，**不用**应用内更新。`Dockerfile` 会从 `frontend/` 重新构建前端，不依赖仓库里的 `static/`。
+用户手动构建安装或用 fork 自己发布的 Docker 镜像，**不用**应用内更新。`Dockerfile` 会从 `frontend/` 重新构建前端，不依赖仓库里的 `static/`。
 
 本地和 `Dockerfile` 的 Node 版本不同时以 Docker 构建结果为准（镜像用 Node 22）。`lazyPage.test.tsx` 的 sessionStorage 用例在 Node 26 下失败、Node 22 下通过，与补丁无关。
 
@@ -107,6 +107,24 @@ git restore static && git clean -fd static   # 构建成功或失败都要还原
 
 安装和服务注册只能在真正运行 `.exe` 后验证。安装包没有签名，SmartScreen 拦截时选“更多信息 → 仍要运行”。覆盖安装会保留 `C:\ProgramData\Bambuddy\` 下的数据。
 
+### 发布 Docker 预发布版
+
+本机没有 Docker，镜像由 GitHub Actions 构建（`.github/workflows/hyyz17200-docker-prerelease.yml`）。先把 `hyyz17200` 推上去，再推 tag：
+
+```bash
+V=$(grep -m1 '^APP_VERSION' backend/app/core/config.py | sed -E 's/.*"([^"]+)".*/\1/')
+TAG="hyyz17200-v$V.$(date +%Y%m%d)"     # 当天再次发布时加 .2、.3
+git tag "$TAG" && git push origin "$TAG"
+gh run list -R hyyz17200/bambuddy --workflow hyyz17200-docker-prerelease.yml --limit 1
+```
+
+工作流依次构建镜像、启动容器自测、推送到 GHCR、创建 pre-release，自测失败就不发布。产物是 `ghcr.io/hyyz17200/bambuddy:<tag>`，`:hyyz17200` 始终指向最新一次发布。只构建 linux/amd64。
+
+- **tag 不能以 `v` 开头**：上游的 `windows-installer.yml` 由 `v*` 触发，在 fork 上会因缺少签名密钥而失败。
+- **只能用 tag 触发**：`workflow_dispatch` 要求工作流在默认分支上，而默认分支 `dev` 不提交补丁。
+
+服务器更新：在现有 compose 目录把 `image:` 改成上面的镜像并删掉 `build: .`，先备份数据，再 `docker compose pull && docker compose up -d`。
+
 ## 在 Windows 上验证后端
 
 这台 Windows 机器上全量测试本来就有约 200 项失败或错误，所以判断补丁有没有问题时，要在**同一个盘**上和 `dev` 对比失败清单（测试路径校验与盘符有关，跨盘对比会多出一批假差异）。
@@ -138,6 +156,7 @@ git restore static && git clean -fd static   # 构建成功或失败都要还原
 | `[feat] Cam wall frame cache` | 后端缓存每台打印机最后一帧好画面，请求立刻返回，后台按需抓帧 | 无 |
 | `[feat] Cam wall keeps the last frame` | 摄像头墙失败时保留上一帧，不再黑屏；实时路数可设为 0 | `CameraTile.tsx`、`CameraWall.tsx`、`CamWallPage.tsx`、`PrintersPage.tsx`、`CameraTile.test.tsx` |
 | `[docs] Windows installer build steps` | 本文件的安装包构建步骤 | 无 |
+| `[infra] Docker prerelease workflow` | 推 tag 后构建 Docker 镜像、自测、发布到 GHCR 和 pre-release | 无（新增工作流文件） |
 
 新增或删除补丁时更新此表。
 
