@@ -1,0 +1,201 @@
+name: Fork Prerelease
+
+# Builds the fork's Windows installer and Docker image, smoke-tests both, then
+# pushes the image to GHCR and publishes a GitHub prerelease with the installer
+# attached. Nothing is published unless both smoke tests pass.
+#
+# Trigger: push a tag named hyyz17200-v<version>.<date>, e.g.
+#   git tag hyyz17200-v1.3.1b1.20261102 && git push origin hyyz17200-v1.3.1b1.20261102
+#
+# The tag must not start with "v": upstream's windows-installer.yml runs on v* and
+# would fail waiting on signing secrets this fork does not have. A tag trigger is
+# used because workflow_dispatch needs the file on the default branch, and dev is
+# a pure upstream mirror. See .claude/rules/hyyz17200-fork.md.
+
+on:
+  push:
+    tags:
+      - 'hyyz17200-v*'
+
+permissions:
+  actions: read # download the installer between jobs
+  contents: write # create the release
+  packages: write # push to ghcr.io
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    env:
+      PYTHONUTF8: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Stage installer files
+        working-directory: installers/windows
+        shell: pwsh
+        run: python build.py
+
+      - name: Compile installer
+        working-directory: installers/windows
+        shell: pwsh
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" bambuddy.iss'
+
+      - name: Smoke test
+        working-directory: installers/windows/build/staging/app
+        shell: pwsh
+        run: |
+          $env:DATA_DIR = Join-Path $env:RUNNER_TEMP 'bambuddy-data'
+          $env:LOG_DIR = Join-Path $env:RUNNER_TEMP 'bambuddy-logs'
+          New-Item -ItemType Directory -Force $env:DATA_DIR, $env:LOG_DIR | Out-Null
+
+          $out = Join-Path $env:RUNNER_TEMP 'bambuddy.out'
+          $err = Join-Path $env:RUNNER_TEMP 'bambuddy.err'
+          $app = Start-Process -FilePath (Resolve-Path '..\python\python.exe') -PassThru -NoNewWindow `
+            -ArgumentList '-m uvicorn backend.app.main:app --host 127.0.0.1 --port 18001 --loop asyncio' `
+            -RedirectStandardOutput $out -RedirectStandardError $err
+
+          try {
+            $base = 'http://127.0.0.1:18001'
+            $ready = $false
+            foreach ($i in 1..60) {
+              try {
+                Invoke-RestMethod "$base/health" | Out-Null
+                $ready = $true
+                break
+              } catch {
+                Start-Sleep -Seconds 3
+              }
+            }
+            if (-not $ready) { throw 'the app did not become healthy' }
+
+            # The fork's routes are mounted.
+            $info = Invoke-RestMethod "$base/api/v1/hyyz17200/info"
+            if ($info.fork -ne 'hyyz17200') { throw "unexpected fork info: $info" }
+
+            # The in-app updater refuses to run.
+            $apply = Invoke-RestMethod -Method Post "$base/api/v1/updates/apply"
+            if ($apply.success -ne $false) { throw "updater did not refuse: $apply" }
+
+            # The frontend was built from the patched source.
+            $hits = Select-String -Path 'static\assets\*' -Pattern 'snapshot-cached' -SimpleMatch -List
+            if (-not $hits) { throw 'patched frontend not found in static/assets' }
+          } catch {
+            Get-Content $out, $err -ErrorAction SilentlyContinue
+            throw
+          } finally {
+            Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer
+          path: installers/windows/build/output/*.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: installer
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build image
+        run: |
+          docker build \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.version=${TAG}" \
+            -t "${IMAGE}:${TAG}" -t "${IMAGE}:hyyz17200" .
+
+      - name: Smoke test
+        run: |
+          docker run -d --name smoke -p 18000:8000 "${IMAGE}:${TAG}"
+
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:18000/health >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "${ready:-}" ]; then
+            echo "::error::the app did not become healthy"
+            exit 1
+          fi
+
+          # The fork's routes are mounted.
+          curl -fsS http://localhost:18000/api/v1/hyyz17200/info | jq -e '.fork == "hyyz17200"'
+
+          # The in-app updater refuses to run.
+          curl -fsS -X POST http://localhost:18000/api/v1/updates/apply | jq -e '.success == false'
+
+          # The frontend was built from the patched source.
+          docker exec smoke grep -rlq 'snapshot-cached' /app/static/assets
+
+      - name: Container logs
+        if: failure()
+        run: docker logs smoke || true
+
+      - name: Download installer
+        uses: actions/download-artifact@v7
+        with:
+          name: windows-installer
+          path: installer
+
+      - name: Push image
+        run: |
+          echo "${{ github.token }}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
+          docker push "${IMAGE}:${TAG}"
+          docker push "${IMAGE}:hyyz17200"
+
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > notes.md <<EOF
+          Built from \`${GITHUB_SHA}\`.
+
+          **Docker (linux/amd64)**
+
+          \`\`\`
+          ${IMAGE}:${TAG}
+          \`\`\`
+
+          \`${IMAGE}:hyyz17200\` always points to the newest prerelease.
+
+          **Windows**
+
+          Run the attached installer. It is unsigned, so SmartScreen may ask for confirmation.
+
+          Back up the data before updating: database migrations only run forward.
+          EOF
+
+          gh release create "${TAG}" \
+            --verify-tag \
+            --prerelease \
+            --latest=false \
+            --title "${TAG}" \
+            --notes-file notes.md \
+            installer/*.exe
