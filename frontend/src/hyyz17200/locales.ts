@@ -5,6 +5,25 @@ import type { ResourceLanguage } from 'i18next';
 const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
   en: {
     inAppUpdateLocked: 'In-app updates are disabled on this fork. Build and install it manually.',
+    printerIntake: {
+      menuStop: 'Stop taking jobs',
+      menuResume: 'Resume taking jobs',
+      pill: 'Not taking jobs',
+      pillTitle:
+        'The queue sends this printer no new jobs. A running print finishes normally, and every control still works. Click to resume.',
+      pipTitle: 'Not taking jobs',
+      printButtonTitle: 'Not taking jobs. Click to resume.',
+      toastStopped: '{{name}} stopped taking jobs. A running print finishes normally.',
+      toastResumed: '{{name}} is taking jobs again.',
+      saveFailed: 'Could not change whether {{name}} takes jobs.',
+      dialogTitle: 'Not taking jobs',
+      dialogPrint:
+        '{{name}} is not taking jobs, so the queue sends it nothing: a print added now would only wait. Resume taking jobs and continue?',
+      dialogResume: '{{name}} is not taking jobs. Resume, so the queue sends it jobs again?',
+      dialogNoPermission:
+        '{{name}} is not taking jobs. Someone who can edit printers has to resume it before the queue sends it anything.',
+      confirmPrint: 'Resume and continue',
+    },
     camWall: {
       frameAge: '{{time}} ago',
       maxLiveZero: '0 keeps every tile on snapshots.',
@@ -53,6 +72,22 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
   },
   'zh-CN': {
     inAppUpdateLocked: '此 fork 已禁用应用内更新，请手动构建安装。',
+    printerIntake: {
+      menuStop: '停止接单',
+      menuResume: '恢复接单',
+      pill: '停止接单',
+      pillTitle: '队列不会再给这台打印机派发新任务。正在进行的打印会正常完成，其他操作都不受影响。点击可恢复接单。',
+      pipTitle: '停止接单',
+      printButtonTitle: '已停止接单，点击可恢复。',
+      toastStopped: '{{name}} 已停止接单，正在进行的打印会正常完成。',
+      toastResumed: '{{name}} 已恢复接单。',
+      saveFailed: '无法更改 {{name}} 的接单状态。',
+      dialogTitle: '已停止接单',
+      dialogPrint: '{{name}} 已停止接单，队列不会给它派发任务，现在添加的打印只会一直等待。要恢复接单并继续吗？',
+      dialogResume: '{{name}} 已停止接单。要恢复接单，让队列重新给它派发任务吗？',
+      dialogNoPermission: '{{name}} 已停止接单。需要由有编辑打印机权限的人恢复接单，队列才会给它派发任务。',
+      confirmPrint: '恢复接单并继续',
+    },
     camWall: {
       frameAge: '{{time}}前',
       maxLiveZero: '设为 0 时所有单元都使用快照。',

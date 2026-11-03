@@ -1,5 +1,6 @@
 """The fork's API routes, all under /hyyz17200."""
 
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, status
@@ -7,10 +8,15 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.auth import RequireCameraStreamTokenIfAuthEnabled, RequirePermissionIfAuthEnabled, StreamOpener
+from backend.app.core.auth import (
+    RequireCameraStreamTokenIfAuthEnabled,
+    RequirePermissionIfAuthEnabled,
+    RequirePrinterPermissionIfAuthEnabled,
+    StreamOpener,
+)
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
-from backend.app.hyyz17200 import camera_frames, enhanced_settings
+from backend.app.hyyz17200 import camera_frames, enhanced_settings, printer_intake
 from backend.app.hyyz17200.hms_filter import load_hidden_codes, normalize_code
 from backend.app.hyyz17200.models.hidden_fault import HiddenFault
 from backend.app.models.printer import Printer
@@ -34,6 +40,18 @@ class HiddenFaultCreate(BaseModel):
     @classmethod
     def _normalize_code(cls, value: str) -> str:
         return normalize_code(value)
+
+
+class IntakeStopResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    printer_id: int
+    stopped_at: datetime | None
+    stopped_by: str | None
+
+
+class IntakeUpdate(BaseModel):
+    stopped: bool
 
 
 @router.get("/info")
@@ -147,3 +165,29 @@ async def remove_hidden_fault(
     await db.delete(fault)
     await db.commit()
     await load_hidden_codes(db)
+
+
+@router.get("/printers/intake-stops", response_model=list[IntakeStopResponse])
+async def list_intake_stops(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # Everyone who sees a printer card needs this to draw it.
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ),
+):
+    """Printers that are not taking queue jobs."""
+    return await printer_intake.list_stops(db)
+
+
+@router.put("/printers/{printer_id}/intake", response_model=IntakeUpdate)
+async def put_printer_intake(
+    printer_id: int,
+    body: IntakeUpdate,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # The permission maintenance mode needs, checked against the caller's
+    # printer scope like upstream's own printer edits.
+    user: User | None = RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_UPDATE),
+):
+    """Stop or resume sending queue jobs to a printer. A running print is not touched."""
+    if await db.scalar(select(Printer.id).where(Printer.id == printer_id)) is None:
+        raise HTTPException(status_code=404, detail="Printer not found")
+    await printer_intake.set_stopped(db, printer_id, body.stopped, user.username if user else None)
+    return body
