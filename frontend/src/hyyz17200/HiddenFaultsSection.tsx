@@ -29,7 +29,8 @@ function displayCode(code: string): string {
   return code.match(/.{4}/g)!.join('-');
 }
 
-export function HiddenFaultsPage() {
+/** The hidden fault codes, as a section of the Enhanced Settings page. */
+export function HiddenFaultsSection() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -67,12 +68,11 @@ export function HiddenFaultsPage() {
   const missingBmcu = BMCU_FAULTS.filter((fault) => !listed.has(fault.code));
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl">
-      <h1 className="text-2xl font-bold text-white mb-2">{t('hyyz17200.hiddenFaults.title')}</h1>
-      <p className="text-sm text-bambu-gray mb-6">{t('hyyz17200.hiddenFaults.description')}</p>
+    <div>
+      <p className="text-sm text-bambu-gray mb-4">{t('hyyz17200.hiddenFaults.description')}</p>
 
       {canEdit && (
-        <Card className="mb-6">
+        <Card className="mb-4">
           <CardContent>
             <form
               className="flex flex-col gap-3"
