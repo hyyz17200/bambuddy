@@ -34,6 +34,9 @@ vi.mock('../../contexts/AuthContext', async (importOriginal) => {
   return { ...actual, useAuth: () => mockUseAuth };
 });
 
+// hyyz17200: the fork's toolbar buttons have their own tests (hyyz17200/bulkActions.test.tsx).
+vi.mock('../../hyyz17200/bulkActions/BulkActions', () => ({ Hyyz17200BulkActions: () => null }));
+
 import { BulkPrinterToolbar } from '../../components/BulkPrinterToolbar';
 
 const printer = (id: number, location: string | null = null) =>
