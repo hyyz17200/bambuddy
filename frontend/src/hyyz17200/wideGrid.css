@@ -1,0 +1,96 @@
+/* hyyz17200 wide grids (see wideGrid.ts). From 1536px wide, the printer card
+   and camera wall grids fit as many columns as the page has room for: each at
+   least --min wide, never more than --cols. Below that, upstream's own
+   grid-cols-* classes apply untouched. This sheet is unlayered, so it wins over
+   Tailwind's utilities layer without needing a stronger selector.
+   wideGrid.ts sets the variables and the data attribute on <html> on import.
+
+   Phones get their own rule further down: below upstream's sm breakpoint every
+   size is grid-cols-1, so there a fixed per-row count applies instead. */
+@media (min-width: 1536px) {
+  :root[data-hyyz17200-wide-grid='on'] .hyyz17200-wide-grid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(max(var(--hyyz17200-min), calc((100% - (var(--hyyz17200-cols) - 1) * var(--hyyz17200-gap)) / var(--hyyz17200-cols))), 1fr)
+    );
+  }
+
+  /* --hyyz17200-gap matches each grid's own gap class: printer cards gap-4,
+     or gap-6 from L up; camera wall gap-3. */
+  .hyyz17200-grid-printer-s {
+    --hyyz17200-cols: var(--hyyz17200-printer-s-max);
+    --hyyz17200-min: var(--hyyz17200-printer-s-min);
+    --hyyz17200-gap: 1rem;
+  }
+  .hyyz17200-grid-printer-m {
+    --hyyz17200-cols: var(--hyyz17200-printer-m-max);
+    --hyyz17200-min: var(--hyyz17200-printer-m-min);
+    --hyyz17200-gap: 1rem;
+  }
+  .hyyz17200-grid-printer-l {
+    --hyyz17200-cols: var(--hyyz17200-printer-l-max);
+    --hyyz17200-min: var(--hyyz17200-printer-l-min);
+    --hyyz17200-gap: 1.5rem;
+  }
+  .hyyz17200-grid-printer-xl {
+    --hyyz17200-cols: var(--hyyz17200-printer-xl-max);
+    --hyyz17200-min: var(--hyyz17200-printer-xl-min);
+    --hyyz17200-gap: 1.5rem;
+  }
+  .hyyz17200-grid-camwall-s {
+    --hyyz17200-cols: var(--hyyz17200-camwall-s-max);
+    --hyyz17200-min: var(--hyyz17200-camwall-s-min);
+    --hyyz17200-gap: 0.75rem;
+  }
+  .hyyz17200-grid-camwall-m {
+    --hyyz17200-cols: var(--hyyz17200-camwall-m-max);
+    --hyyz17200-min: var(--hyyz17200-camwall-m-min);
+    --hyyz17200-gap: 0.75rem;
+  }
+  .hyyz17200-grid-camwall-l {
+    --hyyz17200-cols: var(--hyyz17200-camwall-l-max);
+    --hyyz17200-min: var(--hyyz17200-camwall-l-min);
+    --hyyz17200-gap: 0.75rem;
+  }
+  .hyyz17200-grid-camwall-xl {
+    --hyyz17200-cols: var(--hyyz17200-camwall-xl-max);
+    --hyyz17200-min: var(--hyyz17200-camwall-xl-min);
+    --hyyz17200-gap: 0.75rem;
+  }
+}
+
+/* Phones: the exact complement of Tailwind v4's sm breakpoint (width >= 40rem),
+   where upstream uses grid-cols-1 for every size. A fixed count, not auto-fill:
+   phones differ little in width, and "how many" is what people ask for here.
+   minmax(0, 1fr) is what grid-cols-* uses, so 1 is exactly upstream's layout and
+   long content cannot push a column wider than its share. Independent of the
+   wide screen switch, and 1 (upstream) by default. */
+@media (width < 40rem) {
+  .hyyz17200-wide-grid {
+    grid-template-columns: repeat(var(--hyyz17200-phone, 1), minmax(0, 1fr));
+  }
+  .hyyz17200-grid-printer-s {
+    --hyyz17200-phone: var(--hyyz17200-printer-s-phone, 1);
+  }
+  .hyyz17200-grid-printer-m {
+    --hyyz17200-phone: var(--hyyz17200-printer-m-phone, 1);
+  }
+  .hyyz17200-grid-printer-l {
+    --hyyz17200-phone: var(--hyyz17200-printer-l-phone, 1);
+  }
+  .hyyz17200-grid-printer-xl {
+    --hyyz17200-phone: var(--hyyz17200-printer-xl-phone, 1);
+  }
+  .hyyz17200-grid-camwall-s {
+    --hyyz17200-phone: var(--hyyz17200-camwall-s-phone, 1);
+  }
+  .hyyz17200-grid-camwall-m {
+    --hyyz17200-phone: var(--hyyz17200-camwall-m-phone, 1);
+  }
+  .hyyz17200-grid-camwall-l {
+    --hyyz17200-phone: var(--hyyz17200-camwall-l-phone, 1);
+  }
+  .hyyz17200-grid-camwall-xl {
+    --hyyz17200-phone: var(--hyyz17200-camwall-xl-phone, 1);
+  }
+}
