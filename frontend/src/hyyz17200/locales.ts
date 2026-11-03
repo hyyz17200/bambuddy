@@ -14,6 +14,34 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       title: 'Enhanced Settings',
       description: "Settings for this fork's own features. They apply to everyone using this instance.",
     },
+    wideGrid: {
+      title: 'Grid Layout',
+      description:
+        'How many printer cards and camera wall tiles share a row on wide screens and on phones. Upstream stops adding columns at 1280px wide (S cards 5 per row, M cards 3, camera wall S 5, M 4). With the switch on, from 1536px wide the page fits as many as it has room for, up to the limit below. L and XL start at the upstream 2 and 1 per row; raise their limit to fit more. Below 640px wide (phones held upright) upstream shows every size one per row; "Per row on phones" changes that. Between 640px and 1536px the upstream layout always applies. Applies to every browser.',
+      enabled: 'Fit more per row on wide screens',
+      enabledHint: 'Off: the upstream layout on wide screens. "Per row on phones" still applies.',
+      maxColumns: 'Most per row',
+      minWidth: 'Narrowest (px)',
+      minWidthHint:
+        'Narrowest is the smallest a card or tile may get, in CSS pixels at 100% browser zoom. A row only reaches its limit when the page is wide enough.',
+      phoneColumns: 'Per row on phones',
+      phoneColumnsHint:
+        'Per row on phones is a fixed count below 640px wide; 1 is the upstream layout. A phone is usually 360 to 430px wide, so two per row gives each card about 170px: S cards and camera tiles fit, M, L and XL printer cards get cramped.',
+      grids: {
+        printer_s: 'Printer cards, S',
+        printer_m: 'Printer cards, M',
+        printer_l: 'Printer cards, L',
+        printer_xl: 'Printer cards, XL',
+        camwall_s: 'Camera wall, S',
+        camwall_m: 'Camera wall, M',
+        camwall_l: 'Camera wall, L',
+        camwall_xl: 'Camera wall, XL',
+      },
+      save: 'Save',
+      reset: 'Restore defaults',
+      saved: 'Saved.',
+      saveFailed: 'Could not save the change.',
+    },
     hiddenFaults: {
       title: 'Hidden Faults',
       description:
@@ -40,6 +68,33 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       nav: '增强设置',
       title: '增强设置',
       description: '此 fork 自有功能的设置，对使用此实例的所有人生效。',
+    },
+    wideGrid: {
+      title: '网格布局',
+      description:
+        '宽屏和手机上每行显示多少张打印机卡片和摄像头墙画面。原版在窗口宽 1280px 以后就不再增加列数（S 卡每行 5 台，M 卡 3 台，摄像头墙 S 5 个、M 4 个）。开启开关后，窗口宽度达到 1536px 时按页面实际宽度能放几台就放几台，不超过下面的上限。L 和 XL 默认和原版一样每行 2 个、1 个，调高上限才会多放。窗口窄于 640px（竖着拿的手机）时原版每种尺寸都是一行一个，“手机每行”可以改。640px 到 1536px 之间始终使用原版布局。对所有浏览器生效。',
+      enabled: '宽屏时每行放更多',
+      enabledHint: '关闭后宽屏使用原版布局。“手机每行”不受这个开关影响。',
+      maxColumns: '每行最多',
+      minWidth: '最小宽度（px）',
+      minWidthHint: '最小宽度是单张卡片或画面最窄能到多少，按浏览器 100% 缩放下的 CSS 像素计。页面足够宽时，一行才会排满上限。',
+      phoneColumns: '手机每行',
+      phoneColumnsHint:
+        '手机每行是窗口窄于 640px 时的固定列数，1 就是原版布局。手机一般宽 360 到 430px，每行两个时每张约 170px：S 卡和摄像头画面放得下，打印机 M、L、XL 卡会比较挤。',
+      grids: {
+        printer_s: '打印机卡片 S',
+        printer_m: '打印机卡片 M',
+        printer_l: '打印机卡片 L',
+        printer_xl: '打印机卡片 XL',
+        camwall_s: '摄像头墙 S',
+        camwall_m: '摄像头墙 M',
+        camwall_l: '摄像头墙 L',
+        camwall_xl: '摄像头墙 XL',
+      },
+      save: '保存',
+      reset: '恢复默认',
+      saved: '已保存。',
+      saveFailed: '保存失败。',
     },
     hiddenFaults: {
       title: '隐藏故障',
