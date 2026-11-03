@@ -1,0 +1,57 @@
+/* hyyz17200 wide grids (see wideGrid.ts). From 1536px wide, the printer card
+   and camera wall grids fit as many columns as the page has room for: each at
+   least --min wide, never more than --cols. Below that, upstream's own
+   grid-cols-* classes apply untouched. This sheet is unlayered, so it wins over
+   Tailwind's utilities layer without needing a stronger selector.
+   wideGrid.ts sets the variables and the data attribute on <html> on import. */
+@media (min-width: 1536px) {
+  :root[data-hyyz17200-wide-grid='on'] .hyyz17200-wide-grid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(max(var(--hyyz17200-min), calc((100% - (var(--hyyz17200-cols) - 1) * var(--hyyz17200-gap)) / var(--hyyz17200-cols))), 1fr)
+    );
+  }
+
+  /* --hyyz17200-gap matches each grid's own gap class: printer cards gap-4,
+     or gap-6 from L up; camera wall gap-3. */
+  .hyyz17200-grid-printer-s {
+    --hyyz17200-cols: var(--hyyz17200-printer-s-max);
+    --hyyz17200-min: var(--hyyz17200-printer-s-min);
+    --hyyz17200-gap: 1rem;
+  }
+  .hyyz17200-grid-printer-m {
+    --hyyz17200-cols: var(--hyyz17200-printer-m-max);
+    --hyyz17200-min: var(--hyyz17200-printer-m-min);
+    --hyyz17200-gap: 1rem;
+  }
+  .hyyz17200-grid-printer-l {
+    --hyyz17200-cols: var(--hyyz17200-printer-l-max);
+    --hyyz17200-min: var(--hyyz17200-printer-l-min);
+    --hyyz17200-gap: 1.5rem;
+  }
+  .hyyz17200-grid-printer-xl {
+    --hyyz17200-cols: var(--hyyz17200-printer-xl-max);
+    --hyyz17200-min: var(--hyyz17200-printer-xl-min);
+    --hyyz17200-gap: 1.5rem;
+  }
+  .hyyz17200-grid-camwall-s {
+    --hyyz17200-cols: var(--hyyz17200-camwall-s-max);
+    --hyyz17200-min: var(--hyyz17200-camwall-s-min);
+    --hyyz17200-gap: 0.75rem;
+  }
+  .hyyz17200-grid-camwall-m {
+    --hyyz17200-cols: var(--hyyz17200-camwall-m-max);
+    --hyyz17200-min: var(--hyyz17200-camwall-m-min);
+    --hyyz17200-gap: 0.75rem;
+  }
+  .hyyz17200-grid-camwall-l {
+    --hyyz17200-cols: var(--hyyz17200-camwall-l-max);
+    --hyyz17200-min: var(--hyyz17200-camwall-l-min);
+    --hyyz17200-gap: 0.75rem;
+  }
+  .hyyz17200-grid-camwall-xl {
+    --hyyz17200-cols: var(--hyyz17200-camwall-xl-max);
+    --hyyz17200-min: var(--hyyz17200-camwall-xl-min);
+    --hyyz17200-gap: 0.75rem;
+  }
+}
