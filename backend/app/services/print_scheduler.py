@@ -24,7 +24,7 @@ from backend.app.core.database import async_session, run_with_retry
 from backend.app.core.printer_scope import ALL_PRINTERS, PrinterScope, resolve_user_id_printer_scope
 from backend.app.core.tasks import spawn_background_task
 from backend.app.core.websocket import ws_manager
-from backend.app.hyyz17200 import printer_intake as hyyz17200_intake
+from backend.app.hyyz17200 import plate_swap as hyyz17200_plate_swap, printer_intake as hyyz17200_intake
 from backend.app.models.archive import PrintArchive
 from backend.app.models.library import LibraryFile
 from backend.app.models.print_queue import PrintQueueItem, PrintQueueVariant
@@ -9532,6 +9532,8 @@ class PrintScheduler:
         # the print once the printer confirms it running.
         if end_gcode_injected:
             print_dispatch_context.mark_pending(printer.id)
+        # hyyz17200: persist it per job, so a swapped plate skips the plate-clear check.
+        await hyyz17200_plate_swap.record_dispatch(db, item.id, end_gcode_injected)
 
         # Upload to root directory (not /cache/) - the start_print command references
         # files by name only (ftp://{filename}), so they must be in the root
