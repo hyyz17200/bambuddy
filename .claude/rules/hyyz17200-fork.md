@@ -57,6 +57,7 @@ git push --force-with-lease origin hyyz17200
 | `backend/app/main.py` | `register_hyyz17200(app)` | 接口：`backend/app/hyyz17200/api.py`（全部在 `/api/v1/hyyz17200/` 下） |
 | `backend/app/core/database.py` 的 `init_db()` | 导入模型包、调用迁移 | 表：`backend/app/hyyz17200/models/`，模块要在其 `__init__.py` 里导入；补列：`backend/app/hyyz17200/migrations.py` |
 | `frontend/src/App.tsx` | `{hyyz17200Routes}` | 页面：`frontend/src/hyyz17200/routes.tsx` |
+| `frontend/src/App.tsx` | `<Hyyz17200AppMount />` | 每个页面都要运行的同步组件（含不在 `Layout` 内的 `/camwall`）：`frontend/src/hyyz17200/AppMount.tsx` |
 | `frontend/src/components/Layout.tsx` | `...hyyz17200NavItems` | 侧边栏：`frontend/src/hyyz17200/nav.ts` |
 | `frontend/src/i18n/index.ts` | `withHyyz17200Locale` | 文案：`frontend/src/hyyz17200/locales.ts`，用 `t('hyyz17200.xxx')` |
 
@@ -162,6 +163,7 @@ gh run list -R hyyz17200/bambuddy --workflow hyyz17200-prerelease.yml --limit 1
 | `[feat] Cam wall keeps the last frame` | 摄像头墙失败时保留上一帧，不再黑屏；实时路数可设为 0 | `CameraTile.tsx`、`CameraWall.tsx`、`CamWallPage.tsx`、`PrintersPage.tsx`、`CameraTile.test.tsx` |
 | `[docs] Windows installer build steps` | 本文件的安装包构建步骤 | 无 |
 | `[infra] Prerelease workflow` | 推 tag 后构建安装包和 Docker 镜像、自测、发布到 GHCR 和 pre-release | 无（新增工作流文件） |
+| `[infra] Enhanced settings page` | 侧边栏“增强设置”页，按功能分子页面，汇总所有补丁的配置；隐藏故障成为其中一个子页面，旧地址跳转过来 | `App.tsx`（`HiddenFaultsSync` 换成 `Hyyz17200AppMount`） |
 
 新增或删除补丁时更新此表。
 
@@ -176,6 +178,16 @@ gh run list -R hyyz17200/bambuddy --workflow hyyz17200-prerelease.yml --limit 1
 - rebase 时如果上游改了 `CameraTile.tsx` 的快照逻辑，优先保留这里的取帧方式；`camera_snapshot` 的签名变了，`test_hyyz17200_camera_frames.py` 会失败。
 - 上游如果解决了黑屏，删掉这两个补丁，改用上游的方案。
 
+### 增强设置页
+
+补丁的配置都放在这一页（`/hyyz17200/settings`），不要再为某个功能单独开页面或侧边栏入口。
+
+- 每个功能一个子页面，布局照搬上游设置页：大屏左侧竖排导航，小屏顶部横排；`?tab=<id>` 选子页面，第一个子页面不带参数。
+- 前端：在 `settingsSections.ts` 里加一项（`id`、图标、标题 key、组件），导航顺序就是数组顺序。
+- 后端：需要存值的分区，在 `enhanced_settings.SECTIONS` 里登记一个 pydantic 模型。每个字段都要有默认值：没保存过的分区、或模型改了之后存的值不再合法时，都按默认值返回。值以 JSON 存在 `hyyz17200_setting` 表，每个分区一行。
+- 接口：`GET /api/v1/hyyz17200/settings` 返回所有分区（`printers:read`，打印机页和摄像头墙要读），`PUT /api/v1/hyyz17200/settings/{分区}` 整体替换一个分区（`settings:update`），没传的字段恢复默认。因为看得到打印机的人都能读，这里不能放密钥之类的值。
+- 隐藏故障有自己的接口和表，只是在这一页显示，不走 `SECTIONS`。
+
 ### 隐藏故障码
 
 只在“提醒”这一层隐藏，`PrinterState.hms_errors`、API、WebSocket、调度和失败原因始终能看到全部故障。上游文件各只有一处连接点：
@@ -185,7 +197,7 @@ gh run list -R hyyz17200/bambuddy --workflow hyyz17200-prerelease.yml --limit 1
 | `main.py` 状态回调，`_take_new_hms_faults` 之后 | 过滤推送通知和 MQTT relay 告警（`main.py` “只放挂载代码”的特批例外：这里之后的代码拿不到 `full_code`）。必须放在去重之后，否则取消隐藏时仍在的故障会重新告警 |
 | `notify_live_activities.py` 的 `_printer_fault` | Live Activity 不显示被隐藏的故障 |
 | `HMSErrorModal.tsx` 的 `counts()` | 角标、红点、摄像头墙、批量工具栏都走这里；故障仍折叠显示在弹窗中，“清除错误”按钮保留 |
-| `App.tsx` 的 `<HiddenFaultsSync />` | 加载隐藏列表。挂在 `App` 而不是 `Layout`，因为 `/camwall` 不在 `Layout` 内 |
+| `AppMount.tsx` 里的 `<HiddenFaultsSync />` | 加载隐藏列表。经 `App.tsx` 的 `<Hyyz17200AppMount />` 挂在 `App` 而不是 `Layout`，因为 `/camwall` 不在 `Layout` 内 |
 
 - 匹配规则在 `hms_filter.py` 和 `hiddenFaults.ts` 各有一份，改动时要同步。
 - 默认不隐藏任何码。BMCU 预设不含 `print_error`，`0500_4004` 这类真实的打印错误只能手动添加。
