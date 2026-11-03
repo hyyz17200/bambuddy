@@ -175,6 +175,7 @@ import { FileManagerModal } from '../components/FileManagerModal';
 import { useEmbeddedCameras } from '../contexts/EmbeddedCameraContext';
 import { CameraWall } from '../components/CameraWall';
 import { DEFAULT_CAM_WALL_TILE_SIZE } from '../components/camWallTileSize';
+import { hyyz17200WideGrid } from '../hyyz17200/wideGrid';
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { MQTTDebugModal } from '../components/MQTTDebugModal';
 import { HMSErrorModal, filterKnownHMSErrors, isSevereHMSError } from '../components/HMSErrorModal';
@@ -9383,10 +9384,10 @@ export function PrintersPage() {
   // Grid classes based on card size (1=small, 2=medium, 3=large, 4=xl)
   const getGridClasses = () => {
     switch (cardSize) {
-      case 1: return 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'; // S: many small cards
-      case 2: return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3'; // M: medium cards
-      case 3: return 'grid-cols-1 lg:grid-cols-2'; // L: large cards, 2 columns max
-      case 4: return 'grid-cols-1'; // XL: single column, full width
+      case 1: return `grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 ${hyyz17200WideGrid.printerS}`; // S: many small cards
+      case 2: return `grid-cols-1 md:grid-cols-2 xl:grid-cols-3 ${hyyz17200WideGrid.printerM}`; // M: medium cards
+      case 3: return `grid-cols-1 lg:grid-cols-2 ${hyyz17200WideGrid.printerL}`; // L: large cards, 2 columns max
+      case 4: return `grid-cols-1 ${hyyz17200WideGrid.printerXL}`; // XL: single column, full width
       default: return 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3';
     }
   };
