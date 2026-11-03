@@ -9,8 +9,12 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       frameAge: '{{time}} ago',
       maxLiveZero: '0 keeps every tile on snapshots.',
     },
+    enhancedSettings: {
+      nav: 'Enhanced Settings',
+      title: 'Enhanced Settings',
+      description: "Settings for this fork's own features. They apply to everyone using this instance.",
+    },
     hiddenFaults: {
-      nav: 'Hidden Faults',
       title: 'Hidden Faults',
       description:
         'These codes stop lighting up printer badges and the camera wall, and stop sending notifications. They stay listed, collapsed, in the HMS window, and printing and failure reports are not affected.',
@@ -32,8 +36,12 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       frameAge: '{{time}}前',
       maxLiveZero: '设为 0 时所有单元都使用快照。',
     },
+    enhancedSettings: {
+      nav: '增强设置',
+      title: '增强设置',
+      description: '此 fork 自有功能的设置，对使用此实例的所有人生效。',
+    },
     hiddenFaults: {
-      nav: '隐藏故障',
       title: '隐藏故障',
       description:
         '这些故障码不再点亮打印机角标和摄像头墙，也不再发送通知。它们仍折叠显示在 HMS 窗口中，打印流程和失败记录不受影响。',
