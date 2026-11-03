@@ -15,7 +15,7 @@ import { SpoolBuddyLayout } from './components/spoolbuddy/SpoolBuddyLayout';
 import { PageLoading } from './components/PageLoading';
 import { AuthRetrying } from './components/AuthRetrying';
 import { lazyPage } from './utils/lazyPage';
-import { HiddenFaultsSync } from './hyyz17200/HiddenFaultsSync';
+import { Hyyz17200AppMount } from './hyyz17200/AppMount';
 import { hyyz17200Routes } from './hyyz17200/routes';
 
 // Every page loads as its own file when first opened (#3175).
@@ -194,7 +194,7 @@ function App() {
             <ColorCatalogProvider>
             <SliceJobTrackerProvider>
             <StreamTokenSync />
-            <HiddenFaultsSync />
+            <Hyyz17200AppMount />
             <BrowserRouter>
               {/* Standalone pages (login, camera, overlay, ...) wait here; pages
                   inside a layout wait in that layout, so its frame stays up. */}

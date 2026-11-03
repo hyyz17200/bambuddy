@@ -1,14 +1,16 @@
 """The fork's API routes, all under /hyyz17200."""
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response, status
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Any
+
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, status
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import RequireCameraStreamTokenIfAuthEnabled, RequirePermissionIfAuthEnabled, StreamOpener
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
-from backend.app.hyyz17200 import camera_frames
+from backend.app.hyyz17200 import camera_frames, enhanced_settings
 from backend.app.hyyz17200.hms_filter import load_hidden_codes, normalize_code
 from backend.app.hyyz17200.models.hidden_fault import HiddenFault
 from backend.app.models.printer import Printer
@@ -40,6 +42,36 @@ async def get_fork_info(
 ):
     """Tells a running instance apart from a plain upstream build."""
     return {"fork": "hyyz17200"}
+
+
+@router.get("/settings")
+async def get_enhanced_settings(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # printers:read, like the hidden faults: the printer page and the camera
+    # wall read these to draw, for everyone who can see them.
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ),
+) -> dict[str, dict]:
+    """Every section of the Enhanced Settings page, defaults filled in."""
+    return await enhanced_settings.read_all(db)
+
+
+@router.put("/settings/{section}")
+async def put_enhanced_settings_section(
+    section: str,
+    body: dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.SETTINGS_UPDATE),
+) -> dict:
+    """Replace one section. Fields left out go back to their defaults."""
+    model = enhanced_settings.SECTIONS.get(section)
+    if model is None:
+        raise HTTPException(status_code=404, detail="Unknown settings section")
+    try:
+        value = model.model_validate(body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors(include_url=False, include_context=False)) from exc
+    await enhanced_settings.write_section(db, section, value)
+    return value.model_dump()
 
 
 # "/camera/snapshot" in the path is what lets a request with only a ?token= past
