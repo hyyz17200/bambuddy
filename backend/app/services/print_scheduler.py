@@ -24,6 +24,7 @@ from backend.app.core.database import async_session, run_with_retry
 from backend.app.core.printer_scope import ALL_PRINTERS, PrinterScope, resolve_user_id_printer_scope
 from backend.app.core.tasks import spawn_background_task
 from backend.app.core.websocket import ws_manager
+from backend.app.hyyz17200 import printer_intake as hyyz17200_intake
 from backend.app.models.archive import PrintArchive
 from backend.app.models.library import LibraryFile
 from backend.app.models.print_queue import PrintQueueItem, PrintQueueVariant
@@ -1933,6 +1934,15 @@ class PrintScheduler:
             # generalises that workaround instead of repeating it per case.
             dispatching_printers: set[int] = set(busy_printers)
 
+            # hyyz17200: printers set to stop taking jobs. After the snapshot
+            # above, since no print is coming to them, and before the backoff
+            # below, so their pinned jobs say why they wait. Kept out of
+            # keep-warm further down for the same reason.
+            hyyz17200_stopped = await hyyz17200_intake.stopped_printer_ids(db)
+            for stopped_pid in hyyz17200_stopped:
+                mark_busy(stopped_pid, "set to not take jobs (hyyz17200)")
+                item_hold_reasons.setdefault(stopped_pid, hyyz17200_intake.waiting_reason(printer_label(stopped_pid)))
+
             # Printers whose last upload never reached them (#3210). After the
             # snapshot above on purpose: such a printer is idle, not about to
             # print, and auto-drying must keep treating it as idle.
@@ -2680,7 +2690,7 @@ class PrintScheduler:
             # was, and the next tick tries again.
             try:
                 await self._apply_keep_warm(
-                    db, items, dispatch_ids, busy_printers - backoff_printers, require_plate_clear
+                    db, items, dispatch_ids, busy_printers - backoff_printers - hyyz17200_stopped, require_plate_clear
                 )
             except Exception as e:
                 logger.warning("Keep-warm pass failed, continuing with dispatch: %s", e, exc_info=True)
