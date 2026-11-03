@@ -6,7 +6,7 @@ import { http, HttpResponse } from 'msw';
 import { render } from '../utils';
 import { server } from '../mocks/server';
 import { filterKnownHMSErrors } from '../../components/HMSErrorModal';
-import { HiddenFaultsPage } from '../../hyyz17200/HiddenFaultsPage';
+import { HiddenFaultsSection } from '../../hyyz17200/HiddenFaultsSection';
 import { HiddenFaultsSync } from '../../hyyz17200/HiddenFaultsSync';
 import { setHiddenCodes } from '../../hyyz17200/hiddenFaults';
 import type { HiddenFault } from '../../hyyz17200/hiddenFaultsApi';
@@ -44,10 +44,10 @@ afterEach(() => {
   cleanup();
 });
 
-describe('HiddenFaultsPage', () => {
+describe('HiddenFaultsSection', () => {
   it('normalizes a typed code before saving it', async () => {
     const user = userEvent.setup();
-    render(<HiddenFaultsPage />);
+    render(<HiddenFaultsSection />);
 
     await user.type(screen.getByLabelText('Fault code'), '0500_0400-0001 0044');
     await user.click(screen.getByRole('button', { name: 'Hide code' }));
@@ -58,7 +58,7 @@ describe('HiddenFaultsPage', () => {
 
   it('refuses an invalid code', async () => {
     const user = userEvent.setup();
-    render(<HiddenFaultsPage />);
+    render(<HiddenFaultsSection />);
 
     await user.type(screen.getByLabelText('Fault code'), '0500');
 
@@ -68,7 +68,7 @@ describe('HiddenFaultsPage', () => {
 
   it('warns before hiding a print error', async () => {
     const user = userEvent.setup();
-    render(<HiddenFaultsPage />);
+    render(<HiddenFaultsSection />);
 
     await user.type(screen.getByLabelText('Fault code'), '0500-4004');
 
@@ -77,7 +77,7 @@ describe('HiddenFaultsPage', () => {
 
   it('offers the BMCU codes, which leave print errors alone, until they are all listed', async () => {
     const user = userEvent.setup();
-    render(<HiddenFaultsPage />);
+    render(<HiddenFaultsSection />);
 
     await user.click(await screen.findByRole('button', { name: /BMCU/ }));
 
@@ -95,7 +95,7 @@ describe('HiddenFaultsPage', () => {
   it('removes a code', async () => {
     stored = [{ code: BMCU_A, note: 'BMCU' }];
     const user = userEvent.setup();
-    render(<HiddenFaultsPage />);
+    render(<HiddenFaultsSection />);
 
     await user.click(await screen.findByRole('button', { name: /Stop hiding/ }));
 

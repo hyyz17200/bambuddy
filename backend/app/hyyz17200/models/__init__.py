@@ -6,5 +6,6 @@ rather than adding columns to upstream's tables.
 """
 
 from backend.app.hyyz17200.models.hidden_fault import HiddenFault
+from backend.app.hyyz17200.models.setting import Hyyz17200Setting
 
-__all__ = ["HiddenFault"]
+__all__ = ["HiddenFault", "Hyyz17200Setting"]
