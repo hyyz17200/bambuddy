@@ -14,6 +14,7 @@ import {
 import { Button } from './Button';
 import { filterKnownHMSErrors } from './HMSErrorModal';
 import type { Printer, HMSError } from '../api/client';
+import { Hyyz17200BulkActions } from '../hyyz17200/bulkActions/BulkActions';
 
 export type BulkAction = 'stop' | 'pause' | 'resume' | 'clearPlate' | 'clearHMS';
 export type PrinterState = 'printing' | 'paused' | 'finished' | 'idle' | 'error' | 'offline';
@@ -267,6 +268,9 @@ export function BulkPrinterToolbar({
         <Eraser className="w-3.5 h-3.5" />
         {t('printers.bulk.actions.clearPlate')}
       </Button>
+
+      {/* hyyz17200: move, maintenance, intake, refresh, external spool, CSV */}
+      <Hyyz17200BulkActions selectedIds={selectedIds} printers={printers} disabled={actionPending} />
     </div>
   );
 }
