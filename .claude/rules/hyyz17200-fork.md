@@ -163,6 +163,7 @@ gh run list -R hyyz17200/bambuddy --workflow hyyz17200-prerelease.yml --limit 1
 | `[docs] Windows installer build steps` | 本文件的安装包构建步骤 | 无 |
 | `[infra] Prerelease workflow` | 推 tag 后构建安装包和 Docker 镜像、自测、发布到 GHCR 和 pre-release | 无（新增工作流文件） |
 | `[infra] Enhanced settings page` | 侧边栏“增强设置”页，按功能分子页面，汇总所有补丁的配置；隐藏故障成为其中一个子页面，旧地址跳转过来 | `App.tsx`（`HiddenFaultsSync` 换成 `Hyyz17200AppMount`） |
+| `[feat] Wide screen grid` | 宽屏上打印机卡片和摄像头墙的 S、M 每行放更多，在“增强设置”里调上限和最小宽度 | `PrintersPage.tsx`、`camWallTileSize.ts` |
 
 新增或删除补丁时更新此表。
 
@@ -186,6 +187,17 @@ gh run list -R hyyz17200/bambuddy --workflow hyyz17200-prerelease.yml --limit 1
 - 后端：需要存值的分区，在 `enhanced_settings.SECTIONS` 里登记一个 pydantic 模型。每个字段都要有默认值：没保存过的分区、或模型改了之后存的值不再合法时，都按默认值返回。值以 JSON 存在 `hyyz17200_setting` 表，每个分区一行。
 - 接口：`GET /api/v1/hyyz17200/settings` 返回所有分区（`printers:read`，打印机页和摄像头墙要读），`PUT /api/v1/hyyz17200/settings/{分区}` 整体替换一个分区（`settings:update`），没传的字段恢复默认。因为看得到打印机的人都能读，这里不能放密钥之类的值。
 - 隐藏故障有自己的接口和表，只是在这一页显示，不走 `SECTIONS`。
+
+### 宽屏布局
+
+上游的列数只按断点写死，最大到 `xl`（1280px），之后 S 卡 5 台、M 卡 3 台、摄像头墙 S 5 个、M 4 个，再宽也不变。
+
+- 上游文件里只在 `PrintersPage.tsx` 的 `getGridClasses()` 和 `camWallGridClasses()` 的 S、M 分支末尾追加了 `hyyz17200WideGrid.*` 类名，上游的 `grid-cols-*` 原样保留。L、XL 不动。
+- 规则在 `wideGrid.css`：窗口宽度至少 1536px 时改用 `repeat(auto-fill, minmax(max(最小宽度, 按上限均分的宽度), 1fr))`，按内容区实际宽度排，不超过上限。1536px 以下始终是上游布局。这个样式表不在 Tailwind 的 layer 里，所以不用提高选择器优先级就能覆盖上游类名。
+- `--hyyz17200-gap` 写死成和上游 `gap-4`、`gap-3` 一样。上游改了间距，上限会差一列，要同步改。
+- `wideGrid.ts` 被导入时就把变量写到 `<html>` 上：变量缺失时网格规则失效，会塌成一列。设置值会缓存到 `localStorage`，刷新时不跳动，拿不到设置的 kiosk 墙也能用这台浏览器上次的值。
+- 默认值（S 8/220px、M 6/340px、摄像头墙 S 8/220px、M 6/280px）在 `wide_grid.py` 和 `wideGrid.ts` 各有一份，改动时同步。默认值保证 1536px 时列数不少于上游。
+- 已用真实 Chrome 核对：3072px 宽（4K 屏 125% 缩放）时 S 卡 8 台、M 卡 6 台、摄像头墙 M 6 个；1536px 刚过阈值时和上游一样。
 
 ### 隐藏故障码
 
