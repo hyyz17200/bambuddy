@@ -179,6 +179,7 @@ import { CameraWall } from '../components/CameraWall';
 import { DEFAULT_CAM_WALL_TILE_SIZE } from '../components/camWallTileSize';
 import { savedCamWallControlsMode, saveCamWallControlsMode, type CamWallControlsMode } from '../components/camWallControls';
 import { hyyz17200WideGrid } from '../hyyz17200/wideGrid';
+import { INTAKE_STOPPED_PIP, useHyyz17200Intake } from '../hyyz17200/printerIntake';
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { MQTTDebugModal } from '../components/MQTTDebugModal';
 import { HMSErrorModal, filterKnownHMSErrors, isSevereHMSError } from '../components/HMSErrorModal';
@@ -3455,6 +3456,9 @@ function PrinterCard({
     onError: (error: Error) => showToast(error.message || t('printers.toast.failedToUpdateSetting'), 'error'),
   });
 
+  // hyyz17200: "Stop taking jobs" — the queue skips this printer, nothing else changes.
+  const hyyz17200Intake = useHyyz17200Intake(printer, () => setShowMenu(false));
+
   // Confirm before entering maintenance on a printing printer (entering mode
   // disconnects MQTT, which stops progress tracking + completion notifications
   // for the in-flight job).
@@ -4128,6 +4132,7 @@ function PrinterCard({
               ? t('printers.maintenance.menuEnter')
               : t('printers.maintenance.menuExit')}
           </button>
+          {hyyz17200Intake.menuItem}
           <button
             className="w-full px-4 py-2 text-left text-sm hover:bg-bambu-dark-tertiary flex items-center gap-2"
             onClick={() => {
@@ -4278,6 +4283,8 @@ function PrinterCard({
                         ? 'bg-status-error'
                         : hasSevere
                           ? 'bg-status-error'
+                          : hyyz17200Intake.stopped
+                            ? INTAKE_STOPPED_PIP
                           : hasWarning
                             ? 'bg-status-warning'
                             : 'bg-status-ok';
@@ -4287,6 +4294,8 @@ function PrinterCard({
                         ? t('printers.connection.unavailable')
                         : !status?.connected
                         ? t('printers.connection.offline')
+                        : !hasSevere && hyyz17200Intake.stopped
+                          ? t('hyyz17200.printerIntake.pipTitle')
                         : hasWarning
                           ? `${hmsErrors.length} HMS ${hmsErrors.length === 1 ? 'error' : 'errors'}`
                           : t('printers.connection.connected');
@@ -4386,6 +4395,7 @@ function PrinterCard({
                         : t('printers.connection.unavailable')}
                 </span>
               )}
+              {hyyz17200Intake.pill}
               {/* Run connection diagnostic — offered once the printer is known to be offline, NOT in maintenance */}
               {printer.is_active !== false && connectionState === 'offline' && (
                 <button
@@ -7260,16 +7270,16 @@ function PrinterCard({
                     the two routes into this flow disagreeing. */}
                 <Button
                   size="sm"
-                  onClick={() => setShowUploadForPrint(true)}
+                  onClick={() => hyyz17200Intake.guard(() => setShowUploadForPrint(true))}
                   disabled={!hasPermission('library:upload') || !hasPermission('queue:create')}
                   title={
                     !hasPermission('library:upload')
                       ? t('fileManager.noPermissionUpload')
                       : !hasPermission('queue:create')
                         ? t('fileManager.noPermissionAddToQueue')
-                        : t('common.print')
+                        : hyyz17200Intake.printButtonTitle ?? t('common.print')
                   }
-                  className={`${footerActionButtonClass} !bg-bambu-green hover:!bg-bambu-green/80 !text-white`}
+                  className={`${footerActionButtonClass} ${hyyz17200Intake.printButtonClass ?? '!bg-bambu-green hover:!bg-bambu-green/80 !text-white'}`}
                 >
                   <PrinterIcon className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
                   {t('common.print')}
@@ -7700,6 +7710,7 @@ function PrinterCard({
         />
       )}
 
+      {hyyz17200Intake.dialog}
       {/* Maintenance Mode mid-print confirmation (#1476) — entering maintenance
           disconnects MQTT, which stops progress tracking + completion
           notifications for the in-flight job. Idle / FINISH / FAILED states
