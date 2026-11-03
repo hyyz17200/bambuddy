@@ -108,6 +108,7 @@ from backend.app.core.tasks import spawn_background_task
 from backend.app.core.websocket import ws_manager
 from backend.app.hyyz17200 import register as register_hyyz17200
 from backend.app.hyyz17200.hms_filter import visible_faults as hyyz17200_visible_faults
+from backend.app.hyyz17200.plate_swap import plate_swapped_away as hyyz17200_plate_swapped_away
 from backend.app.services import kprofile_drift, pause_eta, print_dispatch_context, slot_unlink_grace
 from backend.app.services.ams_assignment_lock import get_ams_assignment_lock
 from backend.app.services.archive import ArchiveService, peek_plate_index_in_3mf, swap_plate_suffix
@@ -9151,7 +9152,10 @@ async def _close_out_print(printer_id: int, data: dict):
     except Exception:
         logger.exception("Notify Live Activity completion hook failed for printer %s", printer_id)
     _final_status = data.get("status", "completed")
-    if _final_status in ("completed", "failed", "aborted", "cancelled"):
+    # hyyz17200: unless the print's injected End G-code swapped the plate away.
+    if _final_status in ("completed", "failed", "aborted", "cancelled") and not await hyyz17200_plate_swapped_away(
+        printer_id, data, async_session
+    ):
         printer_manager.set_awaiting_plate_clear(printer_id, True)
 
     # MQTT relay - publish print complete
