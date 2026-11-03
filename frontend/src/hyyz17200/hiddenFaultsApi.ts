@@ -1,4 +1,4 @@
-import { getAuthToken } from '../api/client';
+import { hyyz17200Request } from './request';
 
 export interface HiddenFault {
   code: string;
@@ -7,29 +7,14 @@ export interface HiddenFault {
 
 export const HIDDEN_FAULTS_QUERY_KEY = ['hyyz17200', 'hidden-faults'];
 
-async function send(path: string, init: RequestInit = {}): Promise<Response> {
-  const token = getAuthToken();
-  const response = await fetch(`/api/v1/hyyz17200/hidden-faults${path}`, {
-    ...init,
-    cache: 'no-store',
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response;
-}
-
 export async function listHiddenFaults(): Promise<HiddenFault[]> {
-  return (await send('')).json();
+  return (await hyyz17200Request('/hidden-faults')).json();
 }
 
 export async function addHiddenFault(fault: HiddenFault): Promise<void> {
-  await send('', { method: 'POST', body: JSON.stringify(fault) });
+  await hyyz17200Request('/hidden-faults', { method: 'POST', body: JSON.stringify(fault) });
 }
 
 export async function removeHiddenFault(code: string): Promise<void> {
-  await send(`/${code}`, { method: 'DELETE' });
+  await hyyz17200Request(`/hidden-faults/${code}`, { method: 'DELETE' });
 }
