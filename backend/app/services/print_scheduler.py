@@ -2353,14 +2353,16 @@ class PrintScheduler:
                 if is_count_pending(changer_pid):
                     mark_busy(changer_pid, "its last print is still being closed out")
 
-            # hyyz17200: printers set to stop taking jobs. After the snapshot
-            # above, since no print is coming to them, and before the backoff
-            # below, so their pinned jobs say why they wait. Kept out of
-            # keep-warm further down for the same reason.
-            hyyz17200_stopped = await hyyz17200_intake.stopped_printer_ids(db)
+            # hyyz17200: printers set to stop taking jobs, or in a batch
+            # calibration. After the snapshot above, since no print is coming
+            # to them, and before the backoff below, so their pinned jobs say
+            # why they wait. Kept out of keep-warm further down for the same reason.
+            hyyz17200_stopped = await hyyz17200_intake.queue_skipped_printer_ids(db)
             for stopped_pid in hyyz17200_stopped:
-                mark_busy(stopped_pid, "set to not take jobs (hyyz17200)")
-                item_hold_reasons.setdefault(stopped_pid, hyyz17200_intake.waiting_reason(printer_label(stopped_pid)))
+                mark_busy(stopped_pid, "not taking jobs or calibrating (hyyz17200)")
+                item_hold_reasons.setdefault(
+                    stopped_pid, hyyz17200_intake.waiting_reason(printer_label(stopped_pid), stopped_pid)
+                )
 
             # Printers whose last upload never reached them (#3210). After the
             # snapshot above on purpose: such a printer is idle, not about to

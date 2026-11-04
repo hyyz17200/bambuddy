@@ -130,6 +130,17 @@ beforeEach(() => {
 
 afterEach(() => vi.useRealTimers());
 
+describe('dialog placement', () => {
+  it('renders dialogs outside the toolbar, whose transform would otherwise position them', async () => {
+    const user = userEvent.setup();
+    setup([printer(1), printer(2, { is_active: false })], {});
+    const button = btn(tr('hyyz17200.bulk.maintenance.button'));
+    await user.click(button);
+    const exit = screen.getByRole('radio', { name: new RegExp(tr('printers.maintenance.menuExit')) });
+    expect(button.parentElement!.contains(exit)).toBe(false);
+  });
+});
+
 describe('maintenance', () => {
   it('one dialog: picks the direction, then changes only the printers that need it', async () => {
     const user = userEvent.setup();

@@ -111,6 +111,7 @@ from backend.app.core.tasks import spawn_background_task
 from backend.app.core.websocket import ws_manager
 from backend.app.hyyz17200 import register as register_hyyz17200
 from backend.app.hyyz17200.hms_filter import visible_faults as hyyz17200_visible_faults
+from backend.app.hyyz17200.plate_clear_hook import skips_plate_clear as hyyz17200_skips_plate_clear
 from backend.app.services import kprofile_drift, pause_eta, print_dispatch_context, slot_unlink_grace
 from backend.app.services.ams_assignment_lock import get_ams_assignment_lock
 from backend.app.services.archive import ArchiveService, peek_plate_index_in_3mf, swap_plate_suffix
@@ -9738,7 +9739,8 @@ async def _close_out_print(printer_id: int, data: dict):
             # matched flagged success was raised during this same run (e.g. by the printer's own
             # calibration run); this run's successful end cleared the plate.
             printer_manager.set_awaiting_plate_clear(printer_id, False)
-        else:
+        elif not await hyyz17200_skips_plate_clear(printer_id, data, async_session):
+            # hyyz17200: not after a batch calibration or a maintenance G-code job.
             printer_manager.set_awaiting_plate_clear(printer_id, True)
     if _final_status == "completed":
         # A plate changer spent a plate on a finish nobody has to clear (#3575).
