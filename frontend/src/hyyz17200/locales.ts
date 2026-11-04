@@ -233,6 +233,11 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       saved: 'Saved.',
       saveFailed: 'Could not save.',
     },
+    rgbInputs: {
+      r: 'Red (0–255)',
+      g: 'Green (0–255)',
+      b: 'Blue (0–255)',
+    },
     hiddenFaults: {
       title: 'Hidden Faults',
       description:
@@ -465,6 +470,11 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       reset: '恢复默认',
       saved: '已保存。',
       saveFailed: '保存失败。',
+    },
+    rgbInputs: {
+      r: '红（0–255）',
+      g: '绿（0–255）',
+      b: '蓝（0–255）',
     },
     hiddenFaults: {
       title: '隐藏故障',
