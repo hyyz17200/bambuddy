@@ -32,6 +32,7 @@ Each change is kept as a self-contained patch, with its code under directories n
 - **Wide screen layout**: on wide screens (≥1536px), printer cards and the camera wall fit more per row, with an adjustable maximum and minimum width. Narrower screens keep the upstream layout.
 - **Your own quick colors**: the color swatches under "Custom color" in the AMS slot dialog and in the spool form can be replaced with your own list, shared by both dialogs and every browser. Until you turn it on, each dialog keeps upstream's colors.
 - **RGB color input**: the AMS slot dialog has R, G and B boxes (0–255) under the color field. They follow the hex or color name typed above, and editing them updates it.
+- **Slice as designed, in bulk**: select 3MF projects in the File Manager and click "Slice as designed". Each one is sliced with the printer, process and filament settings saved in the file, exactly as set up in the slicer, without picking presets, and works with custom printer presets that upstream's "Use the file's built-in settings" won't offer. Files are sliced one at a time in the background, and each result is saved as `.gcode.3mf` next to its source. A panel shows progress, lets you stop after the current file, and lists any file that failed or was skipped, with the reason.
 - **Enhanced settings page**: a new "Enhanced settings" sidebar entry that collects the settings for all of the above.
 
 If upstream implements the same feature, this fork drops its own version and uses upstream's.
