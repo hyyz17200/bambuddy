@@ -30,6 +30,7 @@ def _wrap_lifespan(app: FastAPI) -> None:
         from backend.app.hyyz17200 import calibration_batch, slice_as_designed
 
         async with upstream(app_) as state:
+            await _apply_settings()
             await calibration_batch.resume_at_startup()
             try:
                 yield state
@@ -39,3 +40,17 @@ def _wrap_lifespan(app: FastAPI) -> None:
 
     lifespan.hyyz17200 = True
     app.router.lifespan_context = lifespan
+
+
+async def _apply_settings() -> None:
+    """Saved Enhanced Settings that the backend uses. A failure leaves the defaults."""
+    import logging
+
+    from backend.app.core.database import async_session
+    from backend.app.hyyz17200 import enhanced_settings
+
+    try:
+        async with async_session() as db:
+            await enhanced_settings.apply_all(db)
+    except Exception:
+        logging.getLogger(__name__).exception("Could not apply the hyyz17200 settings at startup")

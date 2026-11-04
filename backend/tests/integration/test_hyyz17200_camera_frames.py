@@ -46,7 +46,9 @@ class _Camera:
 def clock(monkeypatch):
     clock = _Clock()
     monkeypatch.setattr(camera_frames, "_now", clock)
-    monkeypatch.setattr(camera_frames, "_capture_slots", asyncio.Semaphore(camera_frames.MAX_CONCURRENT_CAPTURES))
+    monkeypatch.setattr(
+        camera_frames, "_capture_slots", camera_frames._CaptureSlots(camera_frames.DEFAULT_CONCURRENT_CAPTURES)
+    )
     camera_frames._entries.clear()
     yield clock
     for printer_id in list(camera_frames._entries):
@@ -220,7 +222,7 @@ class TestCaptureRate:
                 response = await async_client.get(_url(printer.id))
                 assert response.status_code == 204
             await asyncio.sleep(0.05)
-            assert most == camera_frames.MAX_CONCURRENT_CAPTURES
+            assert most == camera_frames.DEFAULT_CONCURRENT_CAPTURES
 
             release.set()
             for printer in printers:
@@ -228,6 +230,91 @@ class TestCaptureRate:
 
         for printer in printers:
             assert (await async_client.get(_url(printer.id))).content == JPEG_A
+
+    async def test_the_saved_limit_applies_to_captures_already_waiting(self, async_client, printer_factory):
+        printers = [await printer_factory(model="P1S") for _ in range(6)]
+        running = 0
+        most = 0
+        release = asyncio.Event()
+
+        async def slow_camera(*, output_path, **_kwargs) -> bool:
+            nonlocal running, most
+            running += 1
+            most = max(most, running)
+            await release.wait()
+            running -= 1
+            output_path.write_bytes(JPEG_A)
+            return True
+
+        with patch("backend.app.api.routes.camera.capture_camera_frame", side_effect=slow_camera):
+            for printer in printers:
+                await async_client.get(_url(printer.id))
+            await asyncio.sleep(0.05)
+            assert running == 2
+
+            response = await async_client.put(
+                "/api/v1/hyyz17200/settings/cam_wall", json={"max_concurrent_captures": 5}
+            )
+            assert response.status_code == 200
+            await asyncio.sleep(0.05)
+            assert running == 5
+
+            release.set()
+            for printer in printers:
+                await _captured(printer.id)
+
+        assert most == 5
+        assert camera_frames._capture_slots.active == 0
+
+    async def test_a_lower_limit_lets_running_captures_finish(self):
+        slots = camera_frames._CaptureSlots(3)
+        inside = 0
+        most_after = 0
+        release = asyncio.Event()
+        lowered = asyncio.Event()
+
+        async def capture():
+            nonlocal inside, most_after
+            async with slots.slot():
+                inside += 1
+                if lowered.is_set():
+                    most_after = max(most_after, inside)
+                await release.wait()
+                inside -= 1
+
+        tasks = [asyncio.create_task(capture()) for _ in range(6)]
+        await asyncio.sleep(0.01)
+        assert inside == 3
+        slots.set_limit(1)
+        lowered.set()
+        release.set()
+        await asyncio.gather(*tasks)
+
+        assert most_after <= 3
+        assert slots.active == 0
+
+    async def test_a_cancelled_wait_gives_up_its_place(self):
+        slots = camera_frames._CaptureSlots(1)
+        release = asyncio.Event()
+        order = []
+
+        async def capture(name):
+            async with slots.slot():
+                order.append(name)
+                await release.wait()
+
+        first = asyncio.create_task(capture("first"))
+        await asyncio.sleep(0)
+        cancelled = asyncio.create_task(capture("cancelled"))
+        last = asyncio.create_task(capture("last"))
+        await asyncio.sleep(0)
+        cancelled.cancel()
+        release.set()
+        await asyncio.gather(first, last)
+
+        assert cancelled.cancelled()
+        assert order == ["first", "last"]
+        assert slots.active == 0
 
     async def test_a_hung_capture_gives_its_slot_back(self, async_client, printer_factory, monkeypatch):
         monkeypatch.setattr(camera_frames, "CAPTURE_DEADLINE_SECONDS", 0.01)
@@ -244,7 +331,7 @@ class TestCaptureRate:
         entry = camera_frames._entries[printer.id]
         assert entry.failures == 1
         assert entry.task is None
-        assert camera_frames._capture_slots._value == camera_frames.MAX_CONCURRENT_CAPTURES
+        assert camera_frames._capture_slots.active == 0
 
     async def test_a_frame_nobody_asked_for_in_an_hour_is_dropped(self, async_client, printer_factory, camera, clock):
         printer = await _printer_with_frame(async_client, printer_factory, camera)
@@ -315,3 +402,36 @@ class TestAccess:
 
         assert response.status_code == 404
         assert response.content != JPEG_A
+
+
+class TestCamWallSettings:
+    URL = "/api/v1/hyyz17200/settings"
+
+    async def test_unsaved_reads_as_two(self, async_client):
+        assert (await async_client.get(self.URL)).json()["cam_wall"] == {"max_concurrent_captures": 2}
+
+    @pytest.mark.parametrize("value", [0, 17])
+    async def test_out_of_range_is_refused(self, async_client, value):
+        response = await async_client.put(f"{self.URL}/cam_wall", json={"max_concurrent_captures": value})
+
+        assert response.status_code == 422
+        assert camera_frames._capture_slots.limit == camera_frames.DEFAULT_CONCURRENT_CAPTURES
+
+    async def test_a_saved_limit_is_applied_at_startup(self, async_client, db_session, monkeypatch):
+        from contextlib import asynccontextmanager
+
+        from backend.app import hyyz17200
+        from backend.app.hyyz17200 import enhanced_settings
+
+        await async_client.put(f"{self.URL}/cam_wall", json={"max_concurrent_captures": 7})
+        camera_frames._capture_slots.set_limit(2)
+
+        @asynccontextmanager
+        async def session():
+            yield db_session
+
+        monkeypatch.setattr("backend.app.core.database.async_session", session)
+        await hyyz17200._apply_settings()
+
+        assert camera_frames._capture_slots.limit == 7
+        assert "cam_wall" in enhanced_settings.APPLY
