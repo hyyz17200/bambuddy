@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { Search, Clock, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ColorSectionProps, CatalogDisplayColor } from './types';
-import { QUICK_COLORS, ALL_COLORS } from './constants';
+import { QUICK_COLORS, EXTENDED_COLORS } from './constants';
+import { useHyyz17200QuickColors } from '../../hyyz17200/quickColors';
 import { FilamentSwatch } from '../FilamentSwatch';
 import { buildFilamentBackground, FILAMENT_EFFECT_OPTIONS } from '../filamentSwatchHelpers';
 import { getSwatchStyle } from '../../utils/colors';
@@ -37,6 +38,7 @@ export function ColorSection({
   const { t } = useTranslation();
   const [showAllColors, setShowAllColors] = useState(false);
   const [colorSearch, setColorSearch] = useState('');
+  const hyyz17200Colors = useHyyz17200QuickColors(QUICK_COLORS, EXTENDED_COLORS);
 
   // Current rgba in canonical 8-char uppercase form (RRGGBBAA). Used both for
   // preset selection matching and to derive the 6-char hex shown in the
@@ -216,13 +218,14 @@ export function ColorSection({
 
   // Fallback hardcoded colors for search/expand
   const filteredFallbackColors = useMemo(() => {
+    const ALL_COLORS = [...hyyz17200Colors.basic, ...hyyz17200Colors.extended];
     if (colorSearch) {
       return ALL_COLORS.filter(c =>
         c.name.toLowerCase().includes(colorSearch.toLowerCase()),
       );
     }
-    return showAllColors ? ALL_COLORS : QUICK_COLORS;
-  }, [colorSearch, showAllColors]);
+    return showAllColors ? ALL_COLORS : hyyz17200Colors.basic;
+  }, [colorSearch, showAllColors, hyyz17200Colors]);
 
   // #1154: editable buffer for the multi-colour paste field. We keep the raw
   // text the user typed/pasted so they can still see invalid tokens — only

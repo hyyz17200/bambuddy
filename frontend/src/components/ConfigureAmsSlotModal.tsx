@@ -15,6 +15,7 @@ import { useCancellableTimeout } from '../hooks/useCancellableTimeout';
 import { flowApplies, flowLabel, normaliseFlow } from '../utils/nozzleFlow';
 import { useToast } from '../contexts/ToastContext';
 import { ACTIVE_PRINT_STATES } from '../utils/printer';
+import { useHyyz17200QuickColors } from '../hyyz17200/quickColors';
 
 interface SlotInfo {
   amsId: number;
@@ -302,6 +303,7 @@ export function ConfigureAmsSlotModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [showExtendedColors, setShowExtendedColors] = useState(false);
+  const hyyz17200Colors = useHyyz17200QuickColors(QUICK_COLORS_BASIC, QUICK_COLORS_EXTENDED);
   const scrolledToRef = useRef<string>('');
   // The success state is held briefly before the modal closes itself; that
   // timer must not outlive the modal.
@@ -1505,7 +1507,7 @@ export function ConfigureAmsSlotModal({
                     </div>
                   )}
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    {QUICK_COLORS_BASIC.map((color) => (
+                    {hyyz17200Colors.basic.map((color) => (
                       <button
                         key={color.hex}
                         onClick={() => {
@@ -1531,7 +1533,7 @@ export function ConfigureAmsSlotModal({
                   </div>
                   {showExtendedColors && (
                     <div className="flex flex-wrap gap-1.5 mb-2">
-                      {QUICK_COLORS_EXTENDED.map((color) => (
+                      {hyyz17200Colors.extended.map((color) => (
                         <button
                           key={color.hex}
                           onClick={() => {
@@ -1756,7 +1758,7 @@ export function ConfigureAmsSlotModal({
                 )}
                 {/* Quick color buttons */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {QUICK_COLORS_BASIC.map((color) => (
+                  {hyyz17200Colors.basic.map((color) => (
                     <button
                       key={color.hex}
                       onClick={() => {
@@ -1783,7 +1785,7 @@ export function ConfigureAmsSlotModal({
                 {/* Extended colors (collapsible) */}
                 {showExtendedColors && (
                   <div className="flex flex-wrap gap-1.5 mb-2">
-                    {QUICK_COLORS_EXTENDED.map((color) => (
+                    {hyyz17200Colors.extended.map((color) => (
                       <button
                         key={color.hex}
                         onClick={() => {
