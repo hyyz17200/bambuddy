@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { i18nReady, localeBackend } from '../../i18n';
 import i18n from '../../i18n';
+import fileManagerSource from '../../pages/FileManagerPage.tsx?raw';
 
 describe('hyyz17200 mount points', () => {
   it('adds the fork strings to the bundled English', async () => {
@@ -18,5 +19,9 @@ describe('hyyz17200 mount points', () => {
 
     expect(loaded.nav).toBeDefined();
     expect(loaded.hyyz17200).toMatchObject({ inAppUpdateLocked: expect.stringContaining('fork') });
+  });
+
+  it('keeps the slice-as-designed button on the file manager toolbar', () => {
+    expect(fileManagerSource).toContain('<SliceAsDesignedButton selected={selectedFiles} files={selectableFiles} />');
   });
 });
