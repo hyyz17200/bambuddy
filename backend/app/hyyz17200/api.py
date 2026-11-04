@@ -8,7 +8,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.api.routes.cloud import resolve_api_key_cloud_owner
 from backend.app.core.auth import (
+    ApiKeyActor,
+    RequestActor,
     RequestPrinterScope,
     RequireCameraStreamTokenIfAuthEnabled,
     RequirePermissionIfAuthEnabled,
@@ -18,7 +21,13 @@ from backend.app.core.auth import (
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import PrinterScope
-from backend.app.hyyz17200 import calibration_batch, camera_frames, enhanced_settings, printer_intake
+from backend.app.hyyz17200 import (
+    calibration_batch,
+    camera_frames,
+    enhanced_settings,
+    printer_intake,
+    slice_as_designed,
+)
 from backend.app.hyyz17200.hms_filter import load_hidden_codes, normalize_code
 from backend.app.hyyz17200.models.hidden_fault import HiddenFault
 from backend.app.models.printer import Printer
@@ -288,3 +297,46 @@ async def cancel_calibration_batch(
     if not await calibration_batch.cancel_batch(db):
         raise HTTPException(status_code=404, detail="No batch calibration is running")
     return {"cancelled": True}
+
+
+class SliceAsDesignedStart(BaseModel):
+    file_ids: list[int] = Field(min_length=1, max_length=slice_as_designed.MAX_FILES)
+
+
+@router.post("/library/slice-as-designed")
+async def start_slice_as_designed(
+    body: SliceAsDesignedStart,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # The same dependencies as upstream's single-file slice route, which each
+    # file goes through.
+    current_user: User | None = RequirePermissionIfAuthEnabled(Permission.LIBRARY_UPLOAD),
+    api_key_cloud_owner: User | None = Depends(resolve_api_key_cloud_owner),
+    actor: User | ApiKeyActor | None = RequestActor,
+):
+    """Slice the library 3MFs one at a time with their own settings. The
+    results land next to each source as .gcode.3mf."""
+    caller = slice_as_designed.Caller(current_user, api_key_cloud_owner, actor)
+    batch = await slice_as_designed.create_batch(db, body.file_ids, caller)
+    return slice_as_designed.serialize(batch)
+
+
+@router.get("/library/slice-as-designed")
+async def list_slice_as_designed(
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.LIBRARY_UPLOAD),
+    actor: User | ApiKeyActor | None = RequestActor,
+):
+    """The caller's batches: running, queued and recently finished."""
+    return [slice_as_designed.serialize(b) for b in slice_as_designed.list_batches(actor)]
+
+
+@router.post("/library/slice-as-designed/{batch_id}/cancel")
+async def cancel_slice_as_designed(
+    batch_id: int,
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.LIBRARY_UPLOAD),
+    actor: User | ApiKeyActor | None = RequestActor,
+):
+    """Skip the files not started yet. The one slicing now finishes."""
+    batch = slice_as_designed.cancel_batch(batch_id, actor)
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Batch not found")
+    return slice_as_designed.serialize(batch)
