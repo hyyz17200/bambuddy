@@ -5,6 +5,7 @@ import { Hand } from 'lucide-react';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { useCalibrationCard } from './calibration/useCalibrationCard';
 import { INTAKE_STOPS_QUERY_KEY, listIntakeStops, setPrinterIntake } from './printerIntakeApi';
 
 // Another browser may change it; this is how soon the card notices.
@@ -21,7 +22,8 @@ export interface Hyyz17200Intake {
   stopped: boolean;
   /** The card menu's toggle. Closes the menu through `onMenuClose`. */
   menuItem: ReactNode;
-  /** The pill for the M and larger badge row; nothing while taking jobs. */
+  /** The pills for the M and larger badge row: not taking jobs, and a batch
+   *  calibration's place. Nothing when neither applies. */
   pill: ReactNode;
   /** Classes for the Print button, or `undefined` for upstream's green. */
   printButtonClass: string | undefined;
@@ -45,6 +47,10 @@ export function useHyyz17200Intake(
   const canChange = hasPermission('printers:update');
   // The open resume dialog: `then` is what the Print button was about to do.
   const [asking, setAsking] = useState<{ then?: () => void } | null>(null);
+
+  // Rides on this hook's connection points in PrintersPage, so the batch
+  // calibration needs none of its own.
+  const calibration = useCalibrationCard(printer.id);
 
   const { data } = useQuery({
     queryKey: INTAKE_STOPS_QUERY_KEY,
@@ -87,7 +93,7 @@ export function useHyyz17200Intake(
     </button>
   );
 
-  const pill = stopped ? (
+  const intakePill = stopped ? (
     <button
       type="button"
       onClick={() => setAsking({})}
@@ -128,6 +134,14 @@ export function useHyyz17200Intake(
     />
   ) : null;
 
+  const pill =
+    intakePill || calibration.pill ? (
+      <>
+        {intakePill}
+        {calibration.pill}
+      </>
+    ) : null;
+
   return {
     stopped,
     menuItem,
@@ -135,6 +149,11 @@ export function useHyyz17200Intake(
     printButtonClass: stopped ? PRINT_BUTTON_STOPPED : undefined,
     printButtonTitle: stopped ? t('hyyz17200.printerIntake.printButtonTitle') : undefined,
     guard,
-    dialog,
+    dialog: (
+      <>
+        {dialog}
+        {calibration.dialog}
+      </>
+    ),
   };
 }
