@@ -6,7 +6,14 @@ import { Card, CardContent } from '../components/Card';
 import { NumberInput } from '../components/NumberInput';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { CAM_WALL_DEFAULTS, CONCURRENCY_RANGE, normalizeCamWall, type CamWallSettings } from './camWallSettings';
+import {
+  CAM_WALL_DEFAULTS,
+  CONCURRENCY_RANGE,
+  MAX_LIVE_LIMIT_RANGE,
+  applyCamWall,
+  normalizeCamWall,
+  type CamWallSettings,
+} from './camWallSettings';
 import {
   ENHANCED_SETTINGS_QUERY_KEY,
   getEnhancedSettings,
@@ -19,7 +26,8 @@ const SECTION = 'cam_wall';
 const inputClass =
   'w-24 px-3 py-1.5 bg-bambu-dark border border-bambu-dark-tertiary rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-bambu-green disabled:opacity-50';
 
-/** How many camera wall snapshots the server captures at once. */
+/** How many camera wall snapshots the server captures at once, and how many
+ *  live streams the wall may be set to. */
 export function CamWallSection() {
   const { t } = useTranslation();
   const { hasPermission } = useAuth();
@@ -37,6 +45,7 @@ export function CamWallSection() {
     mutationFn: (value: CamWallSettings) => saveEnhancedSettingsSection(SECTION, value),
     onSuccess: (value) => {
       queryClient.setQueryData<EnhancedSettings>(ENHANCED_SETTINGS_QUERY_KEY, (old) => ({ ...old, [SECTION]: value }));
+      applyCamWall(value);
       setDraft(null);
       showToast(t('hyyz17200.camWall.settings.saved'), 'success');
     },
@@ -63,6 +72,22 @@ export function CamWallSection() {
               disabled={!canEdit}
               onChange={(max_concurrent_captures) => setDraft({ ...shown, max_concurrent_captures })}
               aria-label={t('hyyz17200.camWall.settings.concurrency')}
+              className={inputClass}
+            />
+          </label>
+
+          <label className="flex items-center justify-between gap-4">
+            <span>
+              <span className="block text-sm text-white">{t('hyyz17200.camWall.settings.maxLiveLimit')}</span>
+              <span className="block text-xs text-bambu-gray">{t('hyyz17200.camWall.settings.maxLiveLimitHint')}</span>
+            </span>
+            <NumberInput
+              value={shown.max_live_limit}
+              min={MAX_LIVE_LIMIT_RANGE.min}
+              max={MAX_LIVE_LIMIT_RANGE.max}
+              disabled={!canEdit}
+              onChange={(max_live_limit) => setDraft({ ...shown, max_live_limit })}
+              aria-label={t('hyyz17200.camWall.settings.maxLiveLimit')}
               className={inputClass}
             />
           </label>
