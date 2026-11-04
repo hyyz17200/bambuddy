@@ -91,6 +91,7 @@ import { formatFileSize } from '../utils/file';
 import { assignableProjects } from '../utils/projectTree';
 import { openInSlicer, resolveDesktopSlicer, type SlicerType } from '../utils/slicer';
 import { isSlicedLibraryFile, isSliceableLibraryFile } from '../utils/libraryFiles';
+import { SliceAsDesignedButton } from '../hyyz17200/sliceAsDesigned/SliceAsDesignedButton';
 import { useUiSettings } from '../hooks/useUiSettings';
 import { FOLDER_DRAG_TYPE, isValidFolderMove, isWritableFolder, moveDisallowedFolderIds } from '../utils/libraryFolders';
 
@@ -3664,6 +3665,8 @@ export function FileManagerPage() {
                         <span className="hidden sm:inline">{t('fileManager.combine.action')}</span>
                       </Button>
                     )}
+                    {/* hyyz17200: batch slice as designed */}
+                    <SliceAsDesignedButton selected={selectedFiles} files={selectableFiles} />
                     <Button
                       variant="secondary"
                       size="sm"
