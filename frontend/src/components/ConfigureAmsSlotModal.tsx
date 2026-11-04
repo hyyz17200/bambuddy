@@ -16,6 +16,7 @@ import { flowApplies, flowLabel, normaliseFlow } from '../utils/nozzleFlow';
 import { useToast } from '../contexts/ToastContext';
 import { ACTIVE_PRINT_STATES } from '../utils/printer';
 import { useHyyz17200QuickColors } from '../hyyz17200/quickColors';
+import { Hyyz17200RgbInputs } from '../hyyz17200/RgbInputs';
 
 interface SlotInfo {
   amsId: number;
@@ -1590,6 +1591,7 @@ export function ConfigureAmsSlotModal({
                       </button>
                     )}
                   </div>
+                  <Hyyz17200RgbInputs hex={colorHex} placeholderHex={displayColor} onChange={(hex) => { setColorHex(hex); setColorInput(hex); }} />
                   {colorHex && (
                     <p className="text-xs text-bambu-gray mt-1.5">
                       {t('configureAmsSlot.hexLabel', { hex: colorHex })}
@@ -1847,6 +1849,7 @@ export function ConfigureAmsSlotModal({
                     </button>
                   )}
                 </div>
+                <Hyyz17200RgbInputs hex={colorHex} placeholderHex={displayColor} onChange={(hex) => { setColorHex(hex); setColorInput(hex); }} />
                 {colorHex && (
                   <p className="text-xs text-bambu-gray mt-1.5">
                     {t('configureAmsSlot.hexLabel', { hex: colorHex })}
