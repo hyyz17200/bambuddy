@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.auth import (
+    RequestPrinterScope,
     RequireCameraStreamTokenIfAuthEnabled,
     RequirePermissionIfAuthEnabled,
     RequirePrinterPermissionIfAuthEnabled,
@@ -16,7 +17,8 @@ from backend.app.core.auth import (
 )
 from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
-from backend.app.hyyz17200 import camera_frames, enhanced_settings, printer_intake
+from backend.app.core.printer_scope import PrinterScope
+from backend.app.hyyz17200 import calibration_batch, camera_frames, enhanced_settings, printer_intake
 from backend.app.hyyz17200.hms_filter import load_hidden_codes, normalize_code
 from backend.app.hyyz17200.models.hidden_fault import HiddenFault
 from backend.app.models.printer import Printer
@@ -58,6 +60,23 @@ class IntakeUpdate(IgnoresNullForRequiredColumns):
     __orm_table__ = "hyyz17200_printer_intake_stop"
 
     stopped: bool
+
+
+class CalibrationPrinters(BaseModel):
+    printer_ids: list[int] = Field(min_length=1, max_length=500)
+
+
+class CalibrationStart(CalibrationPrinters):
+    bed_leveling: bool = True
+    vibration: bool = True
+    motor_noise: bool = True
+    resume_intake: bool = True
+
+
+_CALIBRATION_ERROR_STATUS = {
+    "batch_running": status.HTTP_409_CONFLICT,
+    "kill_switch": status.HTTP_409_CONFLICT,
+}
 
 
 @router.get("/info")
@@ -197,3 +216,75 @@ async def put_printer_intake(
         raise HTTPException(status_code=404, detail="Printer not found")
     await printer_intake.set_stopped(db, printer_id, body.stopped, user.username if user else None)
     return body
+
+
+async def _printers_in_scope(db: AsyncSession, printer_ids: list[int], scope: PrinterScope) -> list[int]:
+    """The ids, in order, once each; 404 if one does not exist or is not the caller's."""
+    ids = list(dict.fromkeys(printer_ids))
+    found = set((await db.execute(select(Printer.id).where(Printer.id.in_(ids)))).scalars().all())
+    missing = sorted(pid for pid in ids if pid not in found or not scope.allows(pid))
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Printer not found: {', '.join(map(str, missing))}")
+    return ids
+
+
+@router.get("/calibration/batch")
+async def get_calibration_batch(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # Everyone who sees a printer card needs this to draw its calibration pill.
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """The running batch calibration, or the last one; null when there has been none."""
+    return await calibration_batch.read_latest(db, scope.allows)
+
+
+@router.post("/calibration/preview")
+async def preview_calibration_batch(
+    body: CalibrationPrinters,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_CONTROL),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """Per printer: whether it reports motor noise cancellation, and what would
+    hold it up now. Asks the printers for a full report, so takes a few seconds."""
+    ids = await _printers_in_scope(db, body.printer_ids, scope)
+    return await calibration_batch.preview(db, ids)
+
+
+@router.post("/calibration/batch")
+async def start_calibration_batch(
+    body: CalibrationStart,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # Control to calibrate, update to stop the printers taking jobs.
+    user: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_CONTROL, Permission.PRINTERS_UPDATE),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """Calibrate the printers one at a time, in the order given."""
+    ids = await _printers_in_scope(db, body.printer_ids, scope)
+    try:
+        batch = await calibration_batch.create_batch(
+            db,
+            ids,
+            bed_leveling=body.bed_leveling,
+            vibration=body.vibration,
+            motor_noise=body.motor_noise,
+            resume_intake=body.resume_intake,
+            by=user.username if user else None,
+        )
+    except calibration_batch.BatchError as exc:
+        raise HTTPException(
+            status_code=_CALIBRATION_ERROR_STATUS.get(exc.code, status.HTTP_400_BAD_REQUEST), detail=exc.code
+        ) from exc
+    return await calibration_batch.read_latest(db, scope.allows) or {"id": batch.id}
+
+
+@router.post("/calibration/batch/cancel")
+async def cancel_calibration_batch(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_CONTROL),
+):
+    """Stop the running batch. A printer calibrating now finishes on its own."""
+    if not await calibration_batch.cancel_batch(db):
+        raise HTTPException(status_code=404, detail="No batch calibration is running")
+    return {"cancelled": True}
