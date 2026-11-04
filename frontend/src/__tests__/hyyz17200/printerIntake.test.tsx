@@ -178,3 +178,48 @@ describe('printer card — stop taking jobs', () => {
     }
   });
 });
+
+describe('printer card — batch calibration', () => {
+  beforeEach(() => {
+    stopped = true;
+    writes.length = 0;
+  });
+
+  it('shows the calibration pill next to "not taking jobs", and opens the progress', async () => {
+    server.use(
+      http.get('/api/v1/hyyz17200/calibration/batch', () =>
+        HttpResponse.json({
+          id: 1,
+          status: 'running',
+          created_at: '2026-11-03T10:00:00',
+          created_by: 'operator',
+          finished_at: null,
+          bed_leveling: true,
+          vibration: true,
+          motor_noise: true,
+          resume_intake: true,
+          items: [
+            {
+              printer_id: 1,
+              name: 'A1-01',
+              status: 'running',
+              detail: null,
+              blocker: null,
+              option: 14,
+              motor_noise_skipped: false,
+              stage: 'Vibration compensation',
+              started_at: '2026-11-03T10:00:00',
+              finished_at: null,
+            },
+          ],
+        }),
+      ),
+    );
+    renderPage();
+    await screen.findByText('Not taking jobs');
+
+    fireEvent.click(await screen.findByTitle('In a batch calibration. Click for its progress.'));
+
+    expect(await screen.findByText('Calibrating · Vibration compensation')).toBeTruthy();
+  });
+});

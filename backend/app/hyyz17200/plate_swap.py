@@ -22,6 +22,9 @@ doubt costs one "plate cleared" click rather than a print on a full plate.
 The record lives in ``hyyz17200_plate_swap_dispatch`` rather than upstream's
 in-memory ``print_dispatch_context``, so restarting Bambuddy mid-print does not
 make a farm of swappers wait for a click each.
+
+The same hook also lets a completed batch calibration through
+(calibration_batch.skips_plate_clear): it prints nothing.
 """
 
 import logging
@@ -30,6 +33,7 @@ from collections.abc import Callable
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.hyyz17200 import calibration_batch
 from backend.app.hyyz17200.models.plate_swap import PlateSwapDispatch
 from backend.app.models.print_queue import PrintQueueItem
 
@@ -72,6 +76,12 @@ async def plate_swapped_away(printer_id: int, data: dict, session_factory: Calla
         return False
     try:
         async with session_factory() as db:
+            # Also the one place a batch calibration's completion can skip the
+            # check: it leaves nothing on the bed either. Here rather than in
+            # main.py so that file keeps a single hook.
+            if await calibration_batch.skips_plate_clear(db, printer_id, data):
+                logger.info("hyyz17200: printer %s finished a batch calibration, no plate-clear check", printer_id)
+                return True
             swapped = await _swapped(db, printer_id, data)
     except Exception:
         logger.warning("hyyz17200: plate-swap check failed for printer %s", printer_id, exc_info=True)
