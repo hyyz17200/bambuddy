@@ -9,6 +9,7 @@ import type { CamWallControlsMode } from './camWallControls';
 import { filterKnownHMSErrors } from './HMSErrorModal';
 import { api, type PrinterStatus } from '../api/client';
 import type { TimeFormat } from '../utils/date';
+import { useHyyz17200MaxLiveLimit } from '../hyyz17200/camWallSettings';
 
 // The wall only ever reads these three fields off a printer, so it asks for no
 // more than that. Printer[] satisfies this structurally, and so does the
@@ -72,7 +73,6 @@ interface CameraWallProps {
 
 // hyyz17200: 0 keeps every tile on snapshots, leaving the browser's connections free.
 const MIN_MAX_LIVE = 0;
-const MAX_MAX_LIVE = 16;
 const MIN_SNAPSHOT_SEC = 2;
 const MAX_SNAPSHOT_SEC = 60;
 const STATUS_MODES: CameraTileStatusMode[] = ['off', 'compact', 'full'];
@@ -96,6 +96,7 @@ export function CameraWall({
   timeFormat = 'system',
 }: CameraWallProps) {
   const { t } = useTranslation();
+  const maxLiveLimit = useHyyz17200MaxLiveLimit();
   const tileRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
 
   // Reuses the same ['printerStatus', id] cache that each PrinterCard
@@ -167,7 +168,7 @@ export function CameraWall({
   // stream and burning a live-budget slot on them would starve a working tile.
   const modeByPrinter = useMemo(() => {
     const map = new Map<number, CameraTileMode>();
-    let liveBudget = Math.max(0, maxLive);
+    let liveBudget = Math.max(0, Math.min(maxLive, maxLiveLimit)); // hyyz17200
     for (const p of printers) {
       const connected = statusByPrinter.get(p.id)?.connected ?? false;
       if (!visibleIds.has(p.id) || !connected) {
@@ -182,7 +183,7 @@ export function CameraWall({
       }
     }
     return map;
-  }, [printers, visibleIds, maxLive, statusByPrinter]);
+  }, [printers, visibleIds, maxLive, maxLiveLimit, statusByPrinter]);
 
   if (printers.length === 0) {
     return (
@@ -224,11 +225,11 @@ export function CameraWall({
                 <input
                   type="number"
                   min={MIN_MAX_LIVE}
-                  max={MAX_MAX_LIVE}
-                  value={maxLive}
+                  max={maxLiveLimit}
+                  value={Math.min(maxLive, maxLiveLimit)}
                   onChange={(e) => {
                     const n = Math.min(
-                      MAX_MAX_LIVE,
+                      maxLiveLimit,
                       Math.max(MIN_MAX_LIVE, Number(e.target.value) || MIN_MAX_LIVE),
                     );
                     onChangeMaxLive(n);
