@@ -408,7 +408,22 @@ class TestCamWallSettings:
     URL = "/api/v1/hyyz17200/settings"
 
     async def test_unsaved_reads_as_two(self, async_client):
-        assert (await async_client.get(self.URL)).json()["cam_wall"] == {"max_concurrent_captures": 2}
+        assert (await async_client.get(self.URL)).json()["cam_wall"] == {
+            "max_concurrent_captures": 2,
+            "max_live_limit": 16,
+        }
+
+    async def test_a_live_limit_above_upstreams_16_is_kept(self, async_client):
+        wanted = {"max_concurrent_captures": 2, "max_live_limit": 96}
+
+        assert (await async_client.put(f"{self.URL}/cam_wall", json=wanted)).status_code == 200
+        assert (await async_client.get(self.URL)).json()["cam_wall"] == wanted
+
+    @pytest.mark.parametrize("value", [0, 257])
+    async def test_a_live_limit_out_of_range_is_refused(self, async_client, value):
+        response = await async_client.put(f"{self.URL}/cam_wall", json={"max_live_limit": value})
+
+        assert response.status_code == 422
 
     @pytest.mark.parametrize("value", [0, 17])
     async def test_out_of_range_is_refused(self, async_client, value):
