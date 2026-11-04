@@ -65,6 +65,9 @@ class CamWallSettings(BaseModel):
     """The Enhanced Settings' cam wall section."""
 
     max_concurrent_captures: int = Field(default=DEFAULT_CONCURRENT_CAPTURES, ge=1, le=16)
+    # Only the frontend uses this: how far the wall's "Max live streams" knob goes.
+    # Upstream stops it at 16. The server sets no limit of its own.
+    max_live_limit: int = Field(default=16, ge=1, le=256)
 
 
 class _CaptureSlots:

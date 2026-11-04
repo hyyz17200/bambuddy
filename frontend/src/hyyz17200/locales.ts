@@ -178,6 +178,9 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         description:
           "How the camera wall takes snapshots. Each printer shown as a snapshot is captured in turn, a few at a time, so with many printers on the wall a tile refreshes about every (snapshot printers × time per capture ÷ captures at once), however short the wall's snapshot interval. Applies to every browser.",
         concurrency: 'Captures at once',
+        maxLiveLimit: 'Max live streams limit',
+        maxLiveLimitHint:
+          "How far the camera wall's own Max live streams setting goes, 1 to 256 (upstream: 16). Each live tile keeps its own connection to this server and its own to the printer, and decodes video in the browser. Reached over plain HTTP, a browser opens only 6 connections to one server, so more than about 5 live tiles leave the snapshot tiles waiting; served over HTTPS with HTTP/2 (a reverse proxy) that limit goes away.",
         concurrencyHint:
           "How many printers are captured at the same time, 1 to 16. Each capture is its own printer's camera, so the printers do not mind; more costs this server CPU and network. Live tiles that are streaming do not count.",
         save: 'Save',
@@ -473,6 +476,9 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         description:
           '摄像头墙抓取快照的方式。所有以快照显示的打印机轮流抓帧，每次只抓几台，所以墙上打印机多时，每个画面大约每隔（快照打印机数 × 单次抓帧耗时 ÷ 同时抓帧数）更新一次，快照间隔设得再短也一样。对所有浏览器生效。',
         concurrency: '同时抓帧数',
+        maxLiveLimit: '实时画面数上限',
+        maxLiveLimitHint:
+          '摄像头墙自己的“Max live streams”最多能调到多少，1 到 256（原版是 16）。每个实时单元都会单独占用一条到本服务器的连接和一条到打印机的连接，并在浏览器里解码视频。用普通 HTTP 访问时，浏览器对同一服务器最多只开 6 条连接，实时单元超过 5 个左右，快照单元就要排队；经反向代理用 HTTPS（HTTP/2）访问时没有这个限制。',
         concurrencyHint:
           '同时抓帧的打印机台数，1 到 16。每次抓帧连的是各自打印机的摄像头，对打印机没有影响；调大会多占用本服务器的 CPU 和网络。正在播放实时画面的单元不占名额。',
         save: '保存',
