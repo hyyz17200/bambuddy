@@ -123,6 +123,7 @@ async def put_enhanced_settings_section(
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors(include_url=False, include_context=False)) from exc
     await enhanced_settings.write_section(db, section, value)
+    enhanced_settings.apply(section, value)
     return value.model_dump()
 
 
