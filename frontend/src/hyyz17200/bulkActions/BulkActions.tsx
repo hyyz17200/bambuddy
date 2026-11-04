@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { CircleDot, Download, Hand, MapPin, RotateCw, Wrench } from 'lucide-react';
+import { CircleDot, Download, Gauge, Hand, MapPin, RotateCw, Wrench } from 'lucide-react';
 import { api } from '../../api/client';
 import type { Printer, PrinterMaintenanceOverview, PrinterStatus } from '../../api/client';
 import { Button } from '../../components/Button';
@@ -9,16 +10,19 @@ import { ConfirmModal } from '../../components/ConfirmModal';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { ACTIVE_PRINT_STATES } from '../../utils/printer';
+import { OPEN_STATUSES, useCalibrationBatch } from '../calibrationApi';
+import { CalibrationProgress } from '../calibration/CalibrationProgress';
+import { CalibrationStart } from '../calibration/CalibrationStart';
 import { INTAKE_STOPS_QUERY_KEY, listIntakeStops, setPrinterIntake } from '../printerIntakeApi';
 import { BulkExternalSpool } from './BulkExternalSpool';
 import { ChoiceDialog } from './ChoiceDialog';
 import { MoveLocationDialog } from './MoveLocationDialog';
 import { csvFilename, downloadCsv, printerInfoTable, toCsv } from './printerCsv';
 import { runBatch, type BatchResult } from './runBatch';
-import { byName, summarize } from './batchText';
+import { byLocation, byName, summarize } from './batchText';
 import { PrinterNameList } from './PrinterNameList';
 
-type Dialog = 'move' | 'maintenance' | 'intake' | 'refresh' | 'spool';
+type Dialog = 'move' | 'maintenance' | 'intake' | 'refresh' | 'spool' | 'calibrate' | 'calibrationProgress';
 
 interface Props {
   selectedIds: Set<number>;
@@ -38,6 +42,9 @@ export function Hyyz17200BulkActions({ selectedIds, printers, disabled }: Props)
 
   const { data: intakeStops } = useQuery({ queryKey: INTAKE_STOPS_QUERY_KEY, queryFn: listIntakeStops });
   const stopped = new Set(intakeStops?.map((s) => s.printer_id));
+  const { data: calibration } = useCalibrationBatch();
+  const calibrating = calibration?.status === 'running';
+  const calibrated = calibration?.items.filter((i) => !OPEN_STATUSES.includes(i.status)).length ?? 0;
 
   const selected = byName(printers.filter((p) => selectedIds.has(p.id)));
   const statusOf = (id: number) => queryClient.getQueryData<PrinterStatus>(['printerStatus', id]);
@@ -154,11 +161,27 @@ export function Hyyz17200BulkActions({ selectedIds, printers, disabled }: Props)
         <CircleDot className="w-3.5 h-3.5" />
         {t('hyyz17200.bulk.spool.button')}
       </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => setDialog(calibrating ? 'calibrationProgress' : 'calibrate')}
+        disabled={!calibrating && (busy || !canControl || !canUpdate)}
+        title={calibrating || (canControl && canUpdate) ? undefined : t('printers.permission.noControl')}
+      >
+        <Gauge className="w-3.5 h-3.5" />
+        {calibrating
+          ? t('hyyz17200.calibration.progressButton', { done: calibrated, total: calibration.items.length })
+          : t('hyyz17200.calibration.button')}
+      </Button>
       <Button variant="secondary" size="sm" onClick={exportCsv} disabled={!selected.length}>
         <Download className="w-3.5 h-3.5" />
         {t('hyyz17200.bulk.csv.button')}
       </Button>
 
+      {/* The toolbar is centred with a transform, which makes it the containing block of
+          every `position: fixed` descendant: rendered in place, the dialogs were centred
+          on the toolbar and their lower half fell off the screen. */}
+      {dialog && createPortal(<>
       {dialog === 'move' && (
         <MoveLocationDialog printers={selected} saving={running} onMove={move} onCancel={() => setDialog(null)} />
       )}
@@ -233,6 +256,17 @@ export function Hyyz17200BulkActions({ selectedIds, printers, disabled }: Props)
       )}
 
       {dialog === 'spool' && <BulkExternalSpool printers={selected} onClose={() => setDialog(null)} />}
+
+      {dialog === 'calibrate' && (
+        <CalibrationStart
+          printers={byLocation(selected)}
+          hasEarlierBatch={!!calibration}
+          onShowProgress={() => setDialog('calibrationProgress')}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'calibrationProgress' && <CalibrationProgress onClose={() => setDialog(null)} />}
+      </>, document.body)}
     </>
   );
 }
