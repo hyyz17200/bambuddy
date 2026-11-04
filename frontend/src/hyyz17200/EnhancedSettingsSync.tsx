@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { ENHANCED_SETTINGS_QUERY_KEY, getEnhancedSettings } from './enhancedSettingsApi';
+import { applyQuickColors } from './quickColors';
 import { applyWideGrid } from './wideGrid';
 
 const REFRESH_MS = 60_000;
@@ -19,7 +20,9 @@ export function EnhancedSettingsSync() {
   });
 
   useEffect(() => {
-    if (data) applyWideGrid(data.wide_grid);
+    if (!data) return;
+    applyWideGrid(data.wide_grid);
+    applyQuickColors(data.quick_colors);
   }, [data]);
 
   return null;
