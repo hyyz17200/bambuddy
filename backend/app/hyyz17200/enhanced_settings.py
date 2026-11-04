@@ -14,12 +14,14 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.hyyz17200.models.setting import Hyyz17200Setting
+from backend.app.hyyz17200.quick_colors import QuickColorSettings
 from backend.app.hyyz17200.wide_grid import WideGridSettings
 
 logger = logging.getLogger(__name__)
 
 SECTIONS: dict[str, type[BaseModel]] = {
     "wide_grid": WideGridSettings,
+    "quick_colors": QuickColorSettings,
 }
 
 
