@@ -5,8 +5,9 @@ as the capture takes (up to 15s), and a failed capture leaves it with nothing. H
 a request is answered at once with the last good frame, and a capture runs in the
 background when one is due. So a slow or failed capture only makes the frame older.
 
-Captures run while somebody asks, at most one per printer, a few at a time, and less
-often while a printer keeps failing. They go through the upstream snapshot route,
+Captures run while somebody asks, at most one per printer, a few at a time (the
+Enhanced Settings' cam wall section sets how many), and less often while a printer
+keeps failing. They go through the upstream snapshot route,
 which reuses a running live view's frame instead of opening a second connection.
 
 Only the wall uses this. Finish photos and plate detection need a frame taken now,
@@ -17,15 +18,21 @@ import asyncio
 import hashlib
 import logging
 import time
+from collections import deque
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from fastapi import HTTPException
+from pydantic import BaseModel, Field
 
 from backend.app.api.routes.camera import camera_snapshot
 
 logger = logging.getLogger(__name__)
 
-MAX_CONCURRENT_CAPTURES = 2
+# The default of CamWallSettings.max_concurrent_captures. Each capture opens its
+# own printer's camera, so more at once costs this server, not the printers.
+DEFAULT_CONCURRENT_CAPTURES = 2
 # Each of a capture's steps has its own 15s timeout, so it needs an overall limit
 # to give its slot back.
 CAPTURE_DEADLINE_SECONDS = 30.0
@@ -54,8 +61,66 @@ class FrameRead:
     failures: int
 
 
+class CamWallSettings(BaseModel):
+    """The Enhanced Settings' cam wall section."""
+
+    max_concurrent_captures: int = Field(default=DEFAULT_CONCURRENT_CAPTURES, ge=1, le=16)
+
+
+class _CaptureSlots:
+    """A semaphore whose size can change while captures wait on it. First come,
+    first served, so every printer on the wall gets its turn."""
+
+    def __init__(self, limit: int):
+        self.limit = limit
+        self.active = 0
+        self._waiters: deque[asyncio.Future] = deque()
+
+    def set_limit(self, limit: int) -> None:
+        self.limit = limit
+        self._wake()
+
+    def _wake(self) -> None:
+        while self._waiters and self.active < self.limit:
+            waiter = self._waiters.popleft()
+            if not waiter.done():
+                self.active += 1
+                waiter.set_result(None)
+
+    @asynccontextmanager
+    async def slot(self) -> AsyncIterator[None]:
+        if self.active < self.limit and not self._waiters:
+            self.active += 1
+        else:
+            waiter = asyncio.get_running_loop().create_future()
+            self._waiters.append(waiter)
+            try:
+                await waiter
+            except asyncio.CancelledError:
+                if waiter.done() and not waiter.cancelled():
+                    # Given a slot just as it was cancelled: pass it on.
+                    self.active -= 1
+                    self._wake()
+                else:
+                    try:
+                        self._waiters.remove(waiter)
+                    except ValueError:
+                        pass
+                raise
+        try:
+            yield
+        finally:
+            self.active -= 1
+            self._wake()
+
+
 _entries: dict[int, _Entry] = {}
-_capture_slots = asyncio.Semaphore(MAX_CONCURRENT_CAPTURES)
+_capture_slots = _CaptureSlots(DEFAULT_CONCURRENT_CAPTURES)
+
+
+def apply_settings(value: CamWallSettings) -> None:
+    """Use a saved cam wall section. A change applies to the captures waiting now."""
+    _capture_slots.set_limit(value.max_concurrent_captures)
 
 
 def _now() -> float:
@@ -106,7 +171,7 @@ def _forget_unread(now: float) -> None:
 async def _capture(entry: _Entry, printer_id: int) -> None:
     frame = None
     try:
-        async with _capture_slots:
+        async with _capture_slots.slot():
             # Called directly, so its route dependency does not run: the request
             # that started this capture has passed the same check.
             response = await asyncio.wait_for(camera_snapshot(printer_id, None), CAPTURE_DEADLINE_SECONDS)
