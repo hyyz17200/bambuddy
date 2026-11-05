@@ -178,6 +178,7 @@ import { DEFAULT_CAM_WALL_TILE_SIZE } from '../components/camWallTileSize';
 import { savedCamWallControlsMode, saveCamWallControlsMode, type CamWallControlsMode } from '../components/camWallControls';
 import { hyyz17200WideGrid } from '../hyyz17200/wideGrid';
 import { INTAKE_STOPPED_PIP, useHyyz17200Intake } from '../hyyz17200/printerIntake';
+import { PrinterImportButton } from '../hyyz17200/printerImport/PrinterImportButton'; // hyyz17200: bulk add
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { MQTTDebugModal } from '../components/MQTTDebugModal';
 import { HMSErrorModal, filterKnownHMSErrors, isSevereHMSError } from '../components/HMSErrorModal';
@@ -10050,6 +10051,7 @@ export function PrintersPage() {
         <Plus className="w-4 h-4" />
         {t('printers.addPrinter')}
       </Button>
+      <PrinterImportButton inMenu={inMenu} />
     </>
   );
 
