@@ -25,7 +25,9 @@ from backend.app.hyyz17200 import (
     calibration_batch,
     camera_frames,
     enhanced_settings,
+    printer_import,
     printer_intake,
+    printer_scan,
     slice_as_designed,
 )
 from backend.app.hyyz17200.hms_filter import load_hidden_codes, normalize_code
@@ -33,6 +35,7 @@ from backend.app.hyyz17200.models.hidden_fault import HiddenFault
 from backend.app.models.printer import Printer
 from backend.app.models.user import User
 from backend.app.schemas.not_null import IgnoresNullForRequiredColumns
+from backend.app.schemas.printer import PrinterCreate
 
 router = APIRouter(prefix="/hyyz17200", tags=["hyyz17200"])
 
@@ -341,3 +344,80 @@ async def cancel_slice_as_designed(
     if batch is None:
         raise HTTPException(status_code=404, detail="Batch not found")
     return slice_as_designed.serialize(batch)
+
+
+class PrinterImportProbe(BaseModel):
+    ip_addresses: list[str] = Field(min_length=1, max_length=printer_import.MAX_IPS)
+
+
+class PrinterImportOne(BaseModel):
+    printer: PrinterCreate
+    # Run upstream's MQTT probe before saving. Off skips it: the printer is
+    # saved and connected straight away, and a wrong access code shows up as a
+    # printer that does not connect.
+    verify: bool = False
+
+
+@router.post("/printers/import/probe")
+async def probe_printers_for_import(
+    body: PrinterImportProbe,
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_CREATE),
+):
+    """Read each printer's serial number (and model, name when it says) from its IP."""
+    return await printer_import.probe_ips(body.ip_addresses)
+
+
+@router.post("/printers/import")
+async def import_printer(
+    body: PrinterImportOne,
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_CREATE),
+    db: AsyncSession = Depends(get_db, scope="function"),
+):
+    """Add one printer through upstream's Add Printer route. The import page
+    calls this once per row, in order."""
+    try:
+        printer = await printer_import.add_printer(body.printer, db, verify=body.verify)
+    except HTTPException as exc:
+        detail = exc.detail
+        if isinstance(detail, dict):
+            detail = detail.get("code") or detail.get("message")
+        elif isinstance(detail, str) and "serial number already exists" in detail:
+            detail = "duplicate_serial"
+        raise HTTPException(status_code=exc.status_code, detail=str(detail)) from exc
+    return {"id": printer.id, "name": printer.name, "serial_number": printer.serial_number}
+
+
+class PrinterScanStart(BaseModel):
+    subnet: str = Field(min_length=1, max_length=43)
+
+
+_SCAN_ERROR_STATUS = {"scan_running": status.HTTP_409_CONFLICT}
+
+
+@router.post("/printers/scan")
+async def start_printer_scan(
+    body: PrinterScanStart,
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.DISCOVERY_SCAN),
+):
+    """Scan a subnet (up to a /16) for Bambu printers, in the background."""
+    try:
+        scan = await printer_scan.start(body.subnet)
+    except printer_scan.ScanError as exc:
+        raise HTTPException(status_code=_SCAN_ERROR_STATUS.get(str(exc), 400), detail=str(exc)) from exc
+    return printer_scan.serialize(scan)
+
+
+@router.get("/printers/scan")
+async def get_printer_scan(
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.DISCOVERY_SCAN),
+):
+    """The running or last scan: progress and the printers found so far."""
+    return printer_scan.serialize(printer_scan.current())
+
+
+@router.post("/printers/scan/stop")
+async def stop_printer_scan(
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.DISCOVERY_SCAN),
+):
+    """Stop the scan; the printers found so far stay in the result."""
+    return printer_scan.serialize(printer_scan.stop())
