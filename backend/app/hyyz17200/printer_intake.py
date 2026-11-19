@@ -5,14 +5,17 @@ leaves it connected and only keeps the queue from sending it anything new: the
 running print finishes and is recorded, the controls still work, and the
 printer keeps its location, so jobs aimed at that location stay aimed at it.
 
-The scheduler reads :func:`stopped_printer_ids` once per queue pass and treats
-those printers as taken: a job pinned to one waits, a job for "any <model>"
-goes to another printer, and the smart-plug wake step leaves them off.
+The scheduler reads :func:`queue_skipped_printer_ids` once per queue pass and
+treats those printers as taken: a job pinned to one waits, a job for "any
+<model>" goes to another printer, and the smart-plug wake step leaves them off.
+Besides the printers not taking jobs, that includes the ones auto_unload.py is
+unloading for the few minutes it takes, which the printer still reports idle.
 """
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.hyyz17200 import auto_unload
 from backend.app.hyyz17200.models.printer_intake import PrinterIntakeStop
 from backend.app.models.printer import Printer
 
@@ -20,6 +23,7 @@ from backend.app.models.printer import Printer
 # with "Busy:" on purpose: the queue reads that as nothing for the user to do,
 # so no "job waiting" notification goes out for a stop the user turned on.
 WAITING_SUFFIX = "(not taking jobs)"
+UNLOADING_SUFFIX = "(unloading filament)"
 
 
 async def stopped_printer_ids(db: AsyncSession) -> set[int]:
@@ -28,6 +32,12 @@ async def stopped_printer_ids(db: AsyncSession) -> set[int]:
         select(PrinterIntakeStop.printer_id).join(Printer, Printer.id == PrinterIntakeStop.printer_id)
     )
     return {printer_id for (printer_id,) in rows.all()}
+
+
+async def queue_skipped_printer_ids(db: AsyncSession) -> set[int]:
+    """What the queue leaves alone this pass: printers not taking jobs, and
+    printers being unloaded."""
+    return await stopped_printer_ids(db) | auto_unload.busy_printer_ids()
 
 
 async def list_stops(db: AsyncSession) -> list[PrinterIntakeStop]:
@@ -50,5 +60,8 @@ async def set_stopped(db: AsyncSession, printer_id: int, stopped: bool, by: str 
     await db.commit()
 
 
-def waiting_reason(printer_label: str) -> str:
+def waiting_reason(printer_label: str, printer_id: int | None = None) -> str:
+    """A pinned job's waiting reason for a printer from queue_skipped_printer_ids."""
+    if printer_id is not None and auto_unload.is_busy(printer_id):
+        return f"Busy: {printer_label} {UNLOADING_SUFFIX}"
     return f"Busy: {printer_label} {WAITING_SUFFIX}"

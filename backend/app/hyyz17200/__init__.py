@@ -28,14 +28,16 @@ def _wrap_lifespan(app: FastAPI) -> None:
 
     @asynccontextmanager
     async def lifespan(app_: FastAPI):
-        from backend.app.hyyz17200 import calibration_batch, printer_scan, slice_as_designed
+        from backend.app.hyyz17200 import auto_unload, calibration_batch, printer_scan, slice_as_designed
 
         async with upstream(app_) as state:
             await _apply_settings()
             await calibration_batch.resume_at_startup()
+            auto_unload.runner.start()
             try:
                 yield state
             finally:
+                auto_unload.runner.stop()
                 calibration_batch.runner.stop()
                 slice_as_designed.runner.stop()
                 printer_scan.shutdown()

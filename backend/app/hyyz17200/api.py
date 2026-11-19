@@ -22,6 +22,7 @@ from backend.app.core.database import get_db
 from backend.app.core.permissions import Permission
 from backend.app.core.printer_scope import PrinterScope
 from backend.app.hyyz17200 import (
+    auto_unload,
     calibration_batch,
     camera_frames,
     enhanced_settings,
@@ -213,6 +214,24 @@ async def list_intake_stops(
 ):
     """Printers that are not taking queue jobs."""
     return await printer_intake.list_stops(db)
+
+
+@router.get("/auto-unload/status")
+async def get_auto_unload_status(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """Per printer the caller may see: why auto unload is not unloading it now,
+    how long it has sat unchanged, and how its last unload went."""
+    seen = auto_unload.snapshot(scope.allows)
+    rows = (await db.execute(select(Printer.id, Printer.name, Printer.model, Printer.is_active))).all()
+    printers = [
+        {"printer_id": pid, "name": name, "model": model, "is_active": is_active, **seen["printers"].get(pid, {})}
+        for pid, name, model, is_active in rows
+        if scope.allows(pid)
+    ]
+    return {"enabled": seen["enabled"], "idle_minutes": seen["idle_minutes"], "printers": printers}
 
 
 @router.put("/printers/{printer_id}/intake", response_model=IntakeUpdate)

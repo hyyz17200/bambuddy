@@ -50,7 +50,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core import database
 from backend.app.core.tasks import spawn_background_task
-from backend.app.hyyz17200 import calibration_support, printer_intake
+from backend.app.hyyz17200 import auto_unload, calibration_support, printer_intake
 from backend.app.hyyz17200.models.calibration import CalibrationBatch, CalibrationItem
 from backend.app.hyyz17200.models.printer_intake import PrinterIntakeStop
 from backend.app.models.printer import Printer
@@ -136,7 +136,7 @@ def _blocker(printer: Printer | None, require_plate_clear: bool) -> str | None:
         return "plate_clear"
     if (state.state or "").upper() not in IDLE_STATES or upload_in_progress(printer.id):
         return "busy"
-    if _queue_sending_to(printer.id):
+    if _queue_sending_to(printer.id) or auto_unload.is_busy(printer.id):
         return "busy"
     return None
 
