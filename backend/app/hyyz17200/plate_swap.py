@@ -25,6 +25,10 @@ make a farm of swappers wait for a click each.
 
 The same hook also lets a completed batch calibration through
 (calibration_batch.skips_plate_clear): it prints nothing.
+
+A maintenance G-code job the user marked "plate is clear afterwards"
+(maintenance_jobs.py) is recorded as if it had End G-code injected: the file is
+the swap itself, so it gets the same row and the same check.
 """
 
 import logging
@@ -42,6 +46,18 @@ logger = logging.getLogger(__name__)
 # Jobs whose rows may still be read. Rows of every other job are pruned.
 _OPEN_STATUSES = ("pending", "printing")
 
+# Maintenance jobs being sent whose file clears the plate itself. In memory: it
+# only has to last until record_dispatch has written the row.
+_plate_clearing: set[int] = set()
+
+
+def mark_plate_clearing(queue_item_id: int) -> None:
+    _plate_clearing.add(queue_item_id)
+
+
+def unmark_plate_clearing(queue_item_id: int) -> None:
+    _plate_clearing.discard(queue_item_id)
+
 
 async def record_dispatch(db: AsyncSession, queue_item_id: int, end_gcode_injected: bool) -> None:
     """Record whether the job being sent has End G-code in it.
@@ -49,7 +65,8 @@ async def record_dispatch(db: AsyncSession, queue_item_id: int, end_gcode_inject
     Called for every job the scheduler sends, after the injection step, so a
     retried send that lost its injection also loses its row. Does not commit:
     the row goes in with the dispatch's own next commit. Never raises; a
-    failure leaves no row, which keeps the plate-clear check on.
+    failure leaves no row, which keeps the plate-clear check on. A maintenance
+    job marked as clearing the plate gets a row too.
     """
     try:
         async with db.begin_nested():
@@ -60,7 +77,7 @@ async def record_dispatch(db: AsyncSession, queue_item_id: int, end_gcode_inject
                     | PlateSwapDispatch.queue_item_id.not_in(open_jobs)
                 )
             )
-            if end_gcode_injected:
+            if end_gcode_injected or queue_item_id in _plate_clearing:
                 db.add(PlateSwapDispatch(queue_item_id=queue_item_id))
     except Exception:
         logger.warning("hyyz17200: could not record End G-code for queue item %s", queue_item_id, exc_info=True)
