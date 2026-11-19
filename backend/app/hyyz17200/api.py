@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.api.routes.cloud import resolve_api_key_cloud_owner
 from backend.app.core.auth import (
     ApiKeyActor,
+    QueueReviewRequired,
     RequestActor,
     RequestPrinterScope,
     RequireCameraStreamTokenIfAuthEnabled,
@@ -26,6 +27,7 @@ from backend.app.hyyz17200 import (
     calibration_batch,
     camera_frames,
     enhanced_settings,
+    maintenance_jobs,
     printer_import,
     printer_intake,
     printer_scan,
@@ -248,6 +250,42 @@ async def put_printer_intake(
         raise HTTPException(status_code=404, detail="Printer not found")
     await printer_intake.set_stopped(db, printer_id, body.stopped, user.username if user else None)
     return body
+
+
+class MaintenanceJobSend(BaseModel):
+    library_file_id: int
+    # The file leaves the plate clear (it is a plate swap): its completion skips
+    # the plate-clear check.
+    clears_plate: bool = False
+
+
+@router.post("/printers/{printer_id}/maintenance-job")
+async def send_maintenance_job(
+    printer_id: int,
+    body: MaintenanceJobSend,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # Controlling the printer, plus what upstream's queue route needs: the job
+    # is created through it.
+    current_user: User | None = RequirePrinterPermissionIfAuthEnabled(
+        Permission.PRINTERS_CONTROL, Permission.QUEUE_CREATE
+    ),
+    printer_scope: PrinterScope = RequestPrinterScope,
+    review_required: bool = QueueReviewRequired,
+    actor: User | ApiKeyActor | None = RequestActor,
+):
+    """Send one sliced file from the maintenance folder to the printer now,
+    whatever its queue and its "stop taking jobs" say."""
+    item_id = await maintenance_jobs.send(
+        db,
+        printer_id,
+        body.library_file_id,
+        body.clears_plate,
+        current_user=current_user,
+        printer_scope=printer_scope,
+        review_required=review_required,
+        actor=actor,
+    )
+    return {"queue_item_id": item_id}
 
 
 async def _printers_in_scope(db: AsyncSession, printer_ids: list[int], scope: PrinterScope) -> list[int]:
