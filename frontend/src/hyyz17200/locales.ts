@@ -199,6 +199,27 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         saveFailed: 'Could not save.',
       },
     },
+    autoUnload: {
+      title: 'Auto Unload',
+      description:
+        "Unload a printer's filament back into its AMS once it has sat idle a while, so the spools can be taken out without unloading each printer by hand. Useful when the end G-code leaves the filament in the toolhead between jobs. Each idle stretch gets one try: after it, the printer is left alone until it has printed again.",
+      enabled: 'Unload after a long idle',
+      enabledHint: 'Off: filament stays where the last print left it.',
+      idleMinutes: 'Idle minutes',
+      idleMinutesHint:
+        'How long a printer has to sit idle or finished, with nothing changing, before it is unloaded. 5 to 720.',
+      ruleSkipped:
+        'Only filament fed from an AMS slot is unloaded. The external spool (it would need pulling out by hand), dual-nozzle printers, printers with a failed print, a fault showing, an AMS that is busy or drying, a queue job on its way, or in a calibration batch are left alone.',
+      ruleRefresh:
+        'Before unloading, the printer is asked for a full status report (as Force Refresh), and nothing is sent unless the same slot is still loaded.',
+      ruleQueue:
+        "While it unloads, the queue sends the printer nothing. The next job loads the filament again as usual. Results are written to the log; a failed unload shows as the printer's own fault.",
+      rulePower:
+        "A printer a smart plug has switched off cannot be unloaded: keep the idle time shorter than the plug's off delay.",
+      save: 'Save',
+      saved: 'Saved.',
+      saveFailed: 'Could not save.',
+    },
     enhancedSettings: {
       nav: 'Enhanced Settings',
       title: 'Enhanced Settings',
@@ -598,6 +619,23 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         saved: '已保存。',
         saveFailed: '保存失败。',
       },
+    },
+    autoUnload: {
+      title: '自动退料',
+      description:
+        '打印机空闲一段时间后，把工具头里的料退回 AMS，取走料卷时不用再逐台退料。适合结束 G-code 不退料、连续打印时料一直留在工具头里的情况。每段空闲只试一次，之后要等这台打印机再打印过才会重新计时。',
+      enabled: '长时间空闲后退料',
+      enabledHint: '关闭时，料留在上一次打印结束时的位置。',
+      idleMinutes: '空闲分钟数',
+      idleMinutesHint: '打印机处于空闲或打印完成状态、且状态没有任何变化，持续多久后退料。5 到 720。',
+      ruleSkipped:
+        '只退 AMS 槽位送进去的料。外挂料盘（退出后要手动抽出）、双喷嘴打印机、上一单打印失败、有故障提示、AMS 正忙或正在烘干、队列正在派单、在批量校准中的打印机，都不退。',
+      ruleRefresh: '退料前先让打印机发一次完整状态（和“强制刷新”一样），确认还是同一个槽位上着料才发退料命令。',
+      ruleQueue: '退料期间队列不给这台打印机派单，下一单开始时照常重新进料。结果写在日志里；退料失败时打印机会自己报故障。',
+      rulePower: '被智能插座断电的打印机无法退料：空闲分钟数要比插座的断电延迟短。',
+      save: '保存',
+      saved: '已保存。',
+      saveFailed: '保存失败。',
     },
     enhancedSettings: {
       nav: '增强设置',
