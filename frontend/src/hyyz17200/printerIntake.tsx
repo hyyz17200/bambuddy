@@ -6,6 +6,7 @@ import { ConfirmModal } from '../components/ConfirmModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useCalibrationCard } from './calibration/useCalibrationCard';
+import { useMaintenanceJob } from './maintenanceJob/useMaintenanceJob';
 import { INTAKE_STOPS_QUERY_KEY, listIntakeStops, setPrinterIntake } from './printerIntakeApi';
 import { usePrinterMove } from './printerMove';
 
@@ -21,7 +22,8 @@ const PRINT_BUTTON_STOPPED = '!bg-yellow-400 hover:!bg-yellow-300 !text-gray-900
 export interface Hyyz17200Intake {
   /** The queue sends this printer no new jobs. */
   stopped: boolean;
-  /** The card menu's toggle, then "Move to location". Closes the menu through `onMenuClose`. */
+  /** The card menu's toggle, then "Move to location" and "Send maintenance G-code".
+   *  Closes the menu through `onMenuClose`. */
   menuItem: ReactNode;
   /** The pills for the M and larger badge row: not taking jobs, and a batch
    *  calibration's place. Nothing when neither applies. */
@@ -38,7 +40,7 @@ export interface Hyyz17200Intake {
 /** "Stop taking jobs" on one printer card. Unlike maintenance mode the printer
  *  stays connected and every control keeps working; only the queue skips it. */
 export function useHyyz17200Intake(
-  printer: { id: number; name: string; location?: string | null },
+  printer: { id: number; name: string; location?: string | null; model?: string | null },
   onMenuClose: () => void,
 ): Hyyz17200Intake {
   const { t } = useTranslation();
@@ -54,6 +56,8 @@ export function useHyyz17200Intake(
   const calibration = useCalibrationCard(printer.id);
   // Likewise "Move to location" in the card menu.
   const move = usePrinterMove(printer, onMenuClose);
+  // And "Send maintenance G-code".
+  const maintenance = useMaintenanceJob(printer, onMenuClose);
 
   const { data } = useQuery({
     queryKey: INTAKE_STOPS_QUERY_KEY,
@@ -100,6 +104,7 @@ export function useHyyz17200Intake(
     <>
       {intakeMenuItem}
       {move.menuItem}
+      {maintenance.menuItem}
     </>
   );
 
@@ -164,6 +169,7 @@ export function useHyyz17200Intake(
         {dialog}
         {calibration.dialog}
         {move.dialog}
+        {maintenance.dialog}
       </>
     ),
   };
