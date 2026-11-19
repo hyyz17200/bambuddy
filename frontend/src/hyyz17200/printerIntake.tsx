@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useCalibrationCard } from './calibration/useCalibrationCard';
 import { INTAKE_STOPS_QUERY_KEY, listIntakeStops, setPrinterIntake } from './printerIntakeApi';
+import { usePrinterMove } from './printerMove';
 
 // Another browser may change it; this is how soon the card notices.
 const REFRESH_MS = 30_000;
@@ -20,7 +21,7 @@ const PRINT_BUTTON_STOPPED = '!bg-yellow-400 hover:!bg-yellow-300 !text-gray-900
 export interface Hyyz17200Intake {
   /** The queue sends this printer no new jobs. */
   stopped: boolean;
-  /** The card menu's toggle. Closes the menu through `onMenuClose`. */
+  /** The card menu's toggle, then "Move to location". Closes the menu through `onMenuClose`. */
   menuItem: ReactNode;
   /** The pills for the M and larger badge row: not taking jobs, and a batch
    *  calibration's place. Nothing when neither applies. */
@@ -37,7 +38,7 @@ export interface Hyyz17200Intake {
 /** "Stop taking jobs" on one printer card. Unlike maintenance mode the printer
  *  stays connected and every control keeps working; only the queue skips it. */
 export function useHyyz17200Intake(
-  printer: { id: number; name: string },
+  printer: { id: number; name: string; location?: string | null },
   onMenuClose: () => void,
 ): Hyyz17200Intake {
   const { t } = useTranslation();
@@ -51,6 +52,8 @@ export function useHyyz17200Intake(
   // Rides on this hook's connection points in PrintersPage, so the batch
   // calibration needs none of its own.
   const calibration = useCalibrationCard(printer.id);
+  // Likewise "Move to location" in the card menu.
+  const move = usePrinterMove(printer, onMenuClose);
 
   const { data } = useQuery({
     queryKey: INTAKE_STOPS_QUERY_KEY,
@@ -75,7 +78,7 @@ export function useHyyz17200Intake(
       showToast(t('hyyz17200.printerIntake.saveFailed', { name: printer.name }), 'error'),
   });
 
-  const menuItem = (
+  const intakeMenuItem = (
     <button
       className={`w-full px-4 py-2 text-left text-sm flex items-center gap-2 ${
         canChange ? 'hover:bg-bambu-dark-tertiary' : 'opacity-50 cursor-not-allowed'
@@ -91,6 +94,13 @@ export function useHyyz17200Intake(
       <Hand className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
       {t(stopped ? 'hyyz17200.printerIntake.menuResume' : 'hyyz17200.printerIntake.menuStop')}
     </button>
+  );
+
+  const menuItem = (
+    <>
+      {intakeMenuItem}
+      {move.menuItem}
+    </>
   );
 
   const intakePill = stopped ? (
@@ -153,6 +163,7 @@ export function useHyyz17200Intake(
       <>
         {dialog}
         {calibration.dialog}
+        {move.dialog}
       </>
     ),
   };

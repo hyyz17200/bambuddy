@@ -24,6 +24,16 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         '{{name}} is not taking jobs. Someone who can edit printers has to resume it before the queue sends it anything.',
       confirmPrint: 'Resume and continue',
     },
+    printerMove: {
+      menu: 'Move to location',
+      title: 'Move {{name}}',
+      current: 'Now in: {{location}}',
+      here: 'Here now',
+      count_one: '{{count}} printer',
+      count_other: '{{count}} printers',
+      moved: '{{name}} moved to {{location}}.',
+      removed: '{{name}} no longer has a location.',
+    },
     bulk: {
       chooseAction: 'Choose what to do. Printers already in that state are left alone.',
       applicable: '{{count}} printers',
@@ -421,6 +431,16 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       dialogResume: '{{name}} 已停止接单。要恢复接单，让队列重新给它派发任务吗？',
       dialogNoPermission: '{{name}} 已停止接单。需要由有编辑打印机权限的人恢复接单，队列才会给它派发任务。',
       confirmPrint: '恢复接单并继续',
+    },
+    printerMove: {
+      menu: '移动到位置',
+      title: '移动 {{name}}',
+      current: '当前位置：{{location}}',
+      here: '当前位置',
+      count_one: '{{count}} 台',
+      count_other: '{{count}} 台',
+      moved: '{{name}} 已移动到 {{location}}。',
+      removed: '{{name}} 已移出位置。',
     },
     bulk: {
       chooseAction: '选择要执行的操作。已经处于该状态的打印机不会改动。',
