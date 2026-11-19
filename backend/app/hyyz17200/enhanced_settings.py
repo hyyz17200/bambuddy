@@ -18,6 +18,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.hyyz17200 import auto_unload, camera_frames
+from backend.app.hyyz17200.maintenance_jobs import MaintenanceSettings
 from backend.app.hyyz17200.models.setting import Hyyz17200Setting
 from backend.app.hyyz17200.quick_colors import QuickColorSettings
 from backend.app.hyyz17200.wide_grid import WideGridSettings
@@ -29,6 +30,7 @@ SECTIONS: dict[str, type[BaseModel]] = {
     "quick_colors": QuickColorSettings,
     "cam_wall": camera_frames.CamWallSettings,
     "auto_unload": auto_unload.AutoUnloadSettings,
+    "maintenance": MaintenanceSettings,
 }
 
 APPLY: dict[str, Callable[[BaseModel], None]] = {
