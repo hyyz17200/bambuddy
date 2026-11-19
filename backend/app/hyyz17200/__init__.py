@@ -11,11 +11,12 @@ from backend.app.hyyz17200.api import router
 def register(app: FastAPI) -> None:
     """Add the fork's routes and background work. Called from main.py with the
     upstream routers, after the app (and its lifespan) is built."""
-    from backend.app.hyyz17200 import printer_import, slice_as_designed
+    from backend.app.hyyz17200 import maintenance_jobs, printer_import, slice_as_designed
 
     app.include_router(router, prefix=settings.api_prefix)
     slice_as_designed.install()
     printer_import.install()
+    maintenance_jobs.install()
     _wrap_lifespan(app)
 
 
