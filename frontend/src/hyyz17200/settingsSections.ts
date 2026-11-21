@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { BellOff, Camera, ClipboardCheck, FileCog, LayoutGrid, Palette, Repeat, Undo2, type LucideIcon } from 'lucide-react';
+import { AppWindow, BellOff, Camera, ClipboardCheck, FileCog, LayoutGrid, Palette, Repeat, Undo2, type LucideIcon } from 'lucide-react';
 import { AutoUnloadSection } from './AutoUnloadSection';
 import { CamWallSection } from './CamWallSection';
 import { HiddenFaultsSection } from './HiddenFaultsSection';
@@ -7,6 +7,7 @@ import { MaintenanceSection } from './maintenanceJob/MaintenanceSection';
 import { PlateClearSection } from './PlateClearSection';
 import { QuickColorsSection } from './QuickColorsSection';
 import { SlotPreferenceSection } from './SlotPreferenceSection';
+import { TabTitleSection } from './tabTitle/TabTitleSection';
 import { WideGridSection } from './WideGridSection';
 
 /** The Enhanced Settings page's tabs, in rail order; the first opens by default.
@@ -21,6 +22,7 @@ export const enhancedSettingsSections: {
   { id: 'hidden-faults', icon: BellOff, titleKey: 'hyyz17200.hiddenFaults.title', Component: HiddenFaultsSection },
   { id: 'wide-grid', icon: LayoutGrid, titleKey: 'hyyz17200.wideGrid.title', Component: WideGridSection },
   { id: 'cam-wall', icon: Camera, titleKey: 'hyyz17200.camWall.settings.title', Component: CamWallSection },
+  { id: 'tab-title', icon: AppWindow, titleKey: 'hyyz17200.tabTitle.title', Component: TabTitleSection },
   { id: 'quick-colors', icon: Palette, titleKey: 'hyyz17200.quickColors.title', Component: QuickColorsSection },
   { id: 'auto-unload', icon: Undo2, titleKey: 'hyyz17200.autoUnload.title', Component: AutoUnloadSection },
   { id: 'slot-preference', icon: Repeat, titleKey: 'hyyz17200.slotPreference.title', Component: SlotPreferenceSection },
