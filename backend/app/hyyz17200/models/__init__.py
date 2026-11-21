@@ -9,6 +9,7 @@ from backend.app.hyyz17200.models.calibration import CalibrationBatch, Calibrati
 from backend.app.hyyz17200.models.hidden_fault import HiddenFault
 from backend.app.hyyz17200.models.maintenance_job import MaintenanceDispatch
 from backend.app.hyyz17200.models.printer_intake import PrinterIntakeStop
+from backend.app.hyyz17200.models.printer_note import PrinterNote
 from backend.app.hyyz17200.models.setting import Hyyz17200Setting
 
 __all__ = [
@@ -18,4 +19,5 @@ __all__ = [
     "Hyyz17200Setting",
     "MaintenanceDispatch",
     "PrinterIntakeStop",
+    "PrinterNote",
 ]

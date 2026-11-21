@@ -4156,6 +4156,7 @@ function PrinterCard({
                         />
                       );
                     })()}
+                    {hyyz17200Intake.nameBadge /* hyyz17200: printer notes marker */}
                   </div>
                   {viewMode === 'compact' && showClearPlateButton && (
                     <button
