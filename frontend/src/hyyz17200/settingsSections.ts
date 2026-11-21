@@ -1,11 +1,24 @@
 import type { ComponentType } from 'react';
-import { AppWindow, BellOff, Camera, ClipboardCheck, FileCog, LayoutGrid, Palette, Repeat, Undo2, type LucideIcon } from 'lucide-react';
+import {
+  AppWindow,
+  BellOff,
+  Camera,
+  ClipboardCheck,
+  FileCog,
+  HardDrive,
+  LayoutGrid,
+  Palette,
+  Repeat,
+  Undo2,
+  type LucideIcon,
+} from 'lucide-react';
 import { AutoUnloadSection } from './AutoUnloadSection';
 import { CamWallSection } from './CamWallSection';
 import { HiddenFaultsSection } from './HiddenFaultsSection';
 import { MaintenanceSection } from './maintenanceJob/MaintenanceSection';
 import { PlateClearSection } from './PlateClearSection';
 import { QuickColorsSection } from './QuickColorsSection';
+import { SdReuseSection } from './SdReuseSection';
 import { SlotPreferenceSection } from './SlotPreferenceSection';
 import { TabTitleSection } from './tabTitle/TabTitleSection';
 import { WideGridSection } from './WideGridSection';
@@ -28,4 +41,5 @@ export const enhancedSettingsSections: {
   { id: 'slot-preference', icon: Repeat, titleKey: 'hyyz17200.slotPreference.title', Component: SlotPreferenceSection },
   { id: 'maintenance', icon: FileCog, titleKey: 'hyyz17200.maintenance.settings.title', Component: MaintenanceSection },
   { id: 'plate-clear', icon: ClipboardCheck, titleKey: 'hyyz17200.plateClear.title', Component: PlateClearSection },
+  { id: 'sd-reuse', icon: HardDrive, titleKey: 'hyyz17200.sdReuse.title', Component: SdReuseSection },
 ];
