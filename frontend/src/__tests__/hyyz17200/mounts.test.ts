@@ -29,4 +29,8 @@ describe('hyyz17200 mount points', () => {
   it('keeps the bulk add button next to Add Printer', () => {
     expect(printersPageSource).toContain('<PrinterImportButton inMenu={inMenu} />');
   });
+
+  it('keeps the notes marker beside the printer name', () => {
+    expect(printersPageSource).toContain('{hyyz17200Intake.nameBadge');
+  });
 });
