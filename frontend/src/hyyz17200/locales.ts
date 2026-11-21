@@ -328,6 +328,27 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       saved: 'Saved.',
       saveFailed: 'Could not save.',
     },
+    sdReuse: {
+      title: 'SD Card Reuse',
+      description:
+        'A farm prints the same file again and again, and every job uploads it to the printer in full; on an A1 a large file takes minutes. With this on, the file a printer has just printed stays on its SD card, and the next job of the same file starts from there without uploading.',
+      risk:
+        'Normally Bambuddy deletes the file after every print, because some printer models and firmware versions start the last printed file again after a power cycle. This keeps it instead, renamed so the printer does not see it as a print file. That is expected to avoid the problem, but it has not been checked on every model and firmware. Turn it on only if you accept that risk.',
+      enabled: 'Reuse the file printed last',
+      enabledHint: 'Off: the file is uploaded for every job and deleted after it, as in the original.',
+      ruleSame:
+        'Only an identical file is reused: same content as last time (compared by hash, including injected G-code) and a file of the same size still on the card. Any change, even one digit of the plate-swap G-code, means an upload.',
+      ruleLast:
+        'Only the file printed last is kept. A different file is uploaded as before and replaces it, so alternating between files uploads every time.',
+      ruleRestart: 'After Bambuddy restarts, each printer uploads once before it reuses again.',
+      ruleFile:
+        'The kept file is {{file}} in the root of the card, one per printer. Turning this off leaves it there; the printer cannot print it.',
+      confirmTitle: 'Accept the risk?',
+      confirmAccept: 'Accept and turn on',
+      save: 'Save',
+      saved: 'Saved.',
+      saveFailed: 'Could not save.',
+    },
     tabTitle: {
       title: 'Tab Title',
       description:
@@ -960,6 +981,25 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         '对队列派出的所有任务生效，不管是指定打印机的还是“任意某型号”的，也包括维护 G-code。只算 AMS 槽位，不含外挂料盘。',
       rulePreferLowest:
         '在“Prefer lowest remaining filament”生效的打印机上（设置已开启且打印机开着 AMS 备用料），由那个设置决定。',
+      save: '保存',
+      saved: '已保存。',
+      saveFailed: '保存失败。',
+    },
+    sdReuse: {
+      title: 'SD 卡复用',
+      description:
+        '农场常把同一个文件打很多遍，而每一单都要把它完整传给打印机一次；A1 传大文件要好几分钟。打开后，打印机刚打完的文件留在 SD 卡上，下一单还是这个文件时直接从卡上开打，不再上传。',
+      risk:
+        'Bambuddy 原本每打完一单就删除文件，因为部分机型和固件在断电重启后会自动重新打印上一个文件。打开本功能后文件不删，而是改名成打印机不认的文件。按理可以避开这个问题，但没有在所有机型和固件上验证过。接受这个风险再打开。',
+      enabled: '复用上一个打印的文件',
+      enabledHint: '关闭时每一单都上传文件、打完删除，和原版一样。',
+      ruleSame:
+        '只复用完全相同的文件：内容和上次一样（比较哈希，包含注入的 G-code），而且卡上还有一样大小的文件。有任何改动（哪怕换盘 G-code 改了一个数字）都会重新上传。',
+      ruleLast: '只保留最后打的那一个文件。换了文件就照常上传并替换掉它，所以几个文件交替打时每次都会上传。',
+      ruleRestart: 'Bambuddy 重启后，每台打印机要先上传一次，之后才会复用。',
+      ruleFile: '保留的文件在卡的根目录，名为 {{file}}，每台一个。关闭功能后它仍留在卡上，打印机无法打印它。',
+      confirmTitle: '接受风险？',
+      confirmAccept: '接受并打开',
       save: '保存',
       saved: '已保存。',
       saveFailed: '保存失败。',
