@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Hand } from 'lucide-react';
+import { Button } from '../components/Button';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -33,6 +34,11 @@ export interface Hyyz17200Intake {
   /** Next to the printer's name in every card size, the S card included: the
    *  notes marker. Nothing when the printer has no notes to show. */
   nameBadge: ReactNode;
+  /** A one-tap toggle for the card's footer row, left of the camera button,
+   *  sized by the footer's own icon-button classes. Stops at once; resuming
+   *  asks first, so a stray tap on a touch screen never sends a printer that is
+   *  being worked on a job. */
+  footerButton: (className: string) => ReactNode;
   /** Classes for the Print button, or `undefined` for upstream's green. */
   printButtonClass: string | undefined;
   printButtonTitle: string | undefined;
@@ -116,6 +122,28 @@ export function useHyyz17200Intake(
     </>
   );
 
+  const footerButton = (className: string) => (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => {
+        if (stopped) setAsking({});
+        else mutation.mutate({ stop: true });
+      }}
+      disabled={mutation.isPending || !canChange}
+      title={
+        !canChange
+          ? t('printers.permission.noEdit')
+          : t(stopped ? 'hyyz17200.printerIntake.footerResume' : 'hyyz17200.printerIntake.footerStop')
+      }
+      aria-label={t(stopped ? 'hyyz17200.printerIntake.menuResume' : 'hyyz17200.printerIntake.menuStop')}
+      aria-pressed={stopped}
+      className={`${className} ${stopped ? PRINT_BUTTON_STOPPED : ''}`}
+    >
+      <Hand className="w-[var(--pc-i4,1rem)] h-[var(--pc-i4,1rem)]" />
+    </Button>
+  );
+
   const intakePill = stopped ? (
     <button
       type="button"
@@ -170,6 +198,7 @@ export function useHyyz17200Intake(
     menuItem,
     pill,
     nameBadge: notes.badge,
+    footerButton,
     printButtonClass: stopped ? PRINT_BUTTON_STOPPED : undefined,
     printButtonTitle: stopped ? t('hyyz17200.printerIntake.printButtonTitle') : undefined,
     guard,

@@ -30,6 +30,12 @@ describe('hyyz17200 mount points', () => {
     expect(printersPageSource).toContain('<PrinterImportButton inMenu={inMenu} />');
   });
 
+  it('keeps the stop-taking-jobs button left of the camera button', () => {
+    const at = printersPageSource.indexOf('{hyyz17200Intake.footerButton(footerIconButtonClass)');
+    expect(at).toBeGreaterThan(-1);
+    expect(printersPageSource.indexOf('onClick={() => openCameraIn(cameraViewMode)}', at)).toBeGreaterThan(at);
+  });
+
   it('keeps the notes marker beside the printer name', () => {
     expect(printersPageSource).toContain('{hyyz17200Intake.nameBadge');
   });
