@@ -7208,6 +7208,7 @@ function PrinterCard({
             <div className="flex items-center justify-between gap-2">
               {printerActionsMenu}
               <div className="flex items-center justify-end gap-2 flex-wrap">
+                {hyyz17200Intake.footerButton(footerIconButtonClass) /* hyyz17200: stop taking jobs */}
                 {/* Camera split button: the icon opens whichever view was used
                     last, the caret picks between the two and remembers it.
                     Replaces the old Settings > General > Camera switch, which

@@ -106,7 +106,11 @@ describe('printer card — stop taking jobs', () => {
     const menu = card.querySelector('.lucide-ellipsis-vertical, .lucide-more-vertical')?.closest('button');
     expect(menu).toBeTruthy();
     fireEvent.click(menu as HTMLElement);
-    fireEvent.click(await screen.findByRole('button', { name: 'Stop taking jobs' }));
+    // The footer has a toggle with the same name; the menu entry is not one.
+    const entries = await screen.findAllByRole('button', { name: 'Stop taking jobs' });
+    const menuEntry = entries.find((button) => !button.hasAttribute('aria-pressed'));
+    expect(menuEntry).toBeTruthy();
+    fireEvent.click(menuEntry as HTMLElement);
 
     await waitFor(() => expect(writes).toEqual([{ printerId: '1', stopped: true }]));
     expect(await screen.findByText('Not taking jobs')).toBeTruthy();
@@ -157,6 +161,53 @@ describe('printer card — stop taking jobs', () => {
       expect(dot.className).not.toContain('bg-status-ok');
     } finally {
       getItem.mockRestore();
+    }
+  });
+
+  it('stops with one tap on the footer button, left of the camera', async () => {
+    renderPage();
+    await printButton();
+    const card = document.getElementById('printer-card-1') as HTMLElement;
+    const toggle = within(card).getByRole('button', { name: 'Stop taking jobs' });
+    expect(toggle.getAttribute('aria-pressed')).toBe('false');
+    // First in the row that holds the camera, files and Print buttons.
+    const camera = card.querySelector('.lucide-video')?.closest('button') as HTMLElement;
+    expect(toggle.compareDocumentPosition(camera) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(writes).toEqual([{ printerId: '1', stopped: true }]));
+    const pressed = await within(card).findByRole('button', { name: 'Resume taking jobs' });
+    await waitFor(() => expect(pressed.className).toContain('!bg-yellow-400'));
+    expect(pressed.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('asks before resuming from the footer button', async () => {
+    stopped = true;
+    renderPage();
+    await screen.findByText('Not taking jobs');
+    const card = document.getElementById('printer-card-1') as HTMLElement;
+
+    fireEvent.click(await within(card).findByRole('button', { name: 'Resume taking jobs' }));
+    expect(writes).toEqual([]);
+    const dialog = (await screen.findByText(/Resume, so the queue sends it jobs again/)).closest(
+      '[role="dialog"], .fixed',
+    ) as HTMLElement;
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Resume taking jobs' }));
+
+    await waitFor(() => expect(writes).toEqual([{ printerId: '1', stopped: false }]));
+    await waitFor(() => expect(screen.queryByText('Not taking jobs')).toBeNull());
+  });
+
+  it('disables the footer button without permission to edit printers', async () => {
+    permissions.granted = ['printers:read', 'library:upload', 'queue:create'];
+    try {
+      renderPage();
+      await printButton();
+      const card = document.getElementById('printer-card-1') as HTMLElement;
+      expect((within(card).getByRole('button', { name: 'Stop taking jobs' }) as HTMLButtonElement).disabled).toBe(true);
+    } finally {
+      permissions.granted = ['printers:read', 'printers:update', 'library:upload', 'queue:create'];
     }
   });
 
