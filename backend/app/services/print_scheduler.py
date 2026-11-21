@@ -10260,8 +10260,10 @@ class PrintScheduler:
                     if start_gc or end_gc:
                         from backend.app.utils.threemf_tools import inject_gcode_into_3mf
 
-                        injected_path = inject_gcode_into_3mf(
-                            file_path, effective_plate_id, start_gc or None, end_gc or None
+                        # hyyz17200: in a worker thread. Rewriting a big plate's G-code
+                        # takes seconds and would stall MQTT, WebSocket and the API.
+                        injected_path = await asyncio.to_thread(
+                            inject_gcode_into_3mf, file_path, effective_plate_id, start_gc or None, end_gc or None
                         )
                         if injected_path:
                             file_path = injected_path
