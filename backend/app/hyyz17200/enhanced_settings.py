@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.hyyz17200 import auto_unload, camera_frames, slot_preference
+from backend.app.hyyz17200 import auto_unload, camera_frames, sd_reuse, slot_preference
 from backend.app.hyyz17200.maintenance_jobs import MaintenanceSettings
 from backend.app.hyyz17200.models.setting import Hyyz17200Setting
 from backend.app.hyyz17200.quick_colors import QuickColorSettings
@@ -34,12 +34,14 @@ SECTIONS: dict[str, type[BaseModel]] = {
     "maintenance": MaintenanceSettings,
     "slot_preference": slot_preference.SlotPreferenceSettings,
     "tab_title": TabTitleSettings,
+    "sd_reuse": sd_reuse.SdReuseSettings,
 }
 
 APPLY: dict[str, Callable[[BaseModel], None]] = {
     "cam_wall": camera_frames.apply_settings,
     "auto_unload": auto_unload.apply_settings,
     "slot_preference": slot_preference.apply_settings,
+    "sd_reuse": sd_reuse.apply_settings,
 }
 
 
