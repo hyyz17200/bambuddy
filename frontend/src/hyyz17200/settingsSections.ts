@@ -1,11 +1,12 @@
 import type { ComponentType } from 'react';
-import { BellOff, Camera, ClipboardCheck, FileCog, LayoutGrid, Palette, Undo2, type LucideIcon } from 'lucide-react';
+import { BellOff, Camera, ClipboardCheck, FileCog, LayoutGrid, Palette, Repeat, Undo2, type LucideIcon } from 'lucide-react';
 import { AutoUnloadSection } from './AutoUnloadSection';
 import { CamWallSection } from './CamWallSection';
 import { HiddenFaultsSection } from './HiddenFaultsSection';
 import { MaintenanceSection } from './maintenanceJob/MaintenanceSection';
 import { PlateClearSection } from './PlateClearSection';
 import { QuickColorsSection } from './QuickColorsSection';
+import { SlotPreferenceSection } from './SlotPreferenceSection';
 import { WideGridSection } from './WideGridSection';
 
 /** The Enhanced Settings page's tabs, in rail order; the first opens by default.
@@ -22,6 +23,7 @@ export const enhancedSettingsSections: {
   { id: 'cam-wall', icon: Camera, titleKey: 'hyyz17200.camWall.settings.title', Component: CamWallSection },
   { id: 'quick-colors', icon: Palette, titleKey: 'hyyz17200.quickColors.title', Component: QuickColorsSection },
   { id: 'auto-unload', icon: Undo2, titleKey: 'hyyz17200.autoUnload.title', Component: AutoUnloadSection },
+  { id: 'slot-preference', icon: Repeat, titleKey: 'hyyz17200.slotPreference.title', Component: SlotPreferenceSection },
   { id: 'maintenance', icon: FileCog, titleKey: 'hyyz17200.maintenance.settings.title', Component: MaintenanceSection },
   { id: 'plate-clear', icon: ClipboardCheck, titleKey: 'hyyz17200.plateClear.title', Component: PlateClearSection },
 ];
