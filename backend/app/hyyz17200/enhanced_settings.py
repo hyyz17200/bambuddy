@@ -21,6 +21,7 @@ from backend.app.hyyz17200 import auto_unload, camera_frames, slot_preference
 from backend.app.hyyz17200.maintenance_jobs import MaintenanceSettings
 from backend.app.hyyz17200.models.setting import Hyyz17200Setting
 from backend.app.hyyz17200.quick_colors import QuickColorSettings
+from backend.app.hyyz17200.tab_title import TabTitleSettings
 from backend.app.hyyz17200.wide_grid import WideGridSettings
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ SECTIONS: dict[str, type[BaseModel]] = {
     "auto_unload": auto_unload.AutoUnloadSettings,
     "maintenance": MaintenanceSettings,
     "slot_preference": slot_preference.SlotPreferenceSettings,
+    "tab_title": TabTitleSettings,
 }
 
 APPLY: dict[str, Callable[[BaseModel], None]] = {
