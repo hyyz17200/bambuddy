@@ -1,7 +1,7 @@
 """The fork's API routes, all under /hyyz17200."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response, status
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -30,6 +30,7 @@ from backend.app.hyyz17200 import (
     maintenance_jobs,
     printer_import,
     printer_intake,
+    printer_notes,
     printer_scan,
     slice_as_designed,
 )
@@ -249,6 +250,134 @@ async def put_printer_intake(
         raise HTTPException(status_code=404, detail="Printer not found")
     await printer_intake.set_stopped(db, printer_id, body.stopped, user.username if user else None)
     return body
+
+
+NoteKind = Literal["info", "todo", "done"]
+
+
+def _note_body(value: str | None) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if not value:
+        raise ValueError("A note cannot be empty")
+    if len(value) > printer_notes.BODY_MAX_LENGTH:
+        raise ValueError(f"A note is at most {printer_notes.BODY_MAX_LENGTH} characters")
+    return value
+
+
+class PrinterNoteCreate(BaseModel):
+    body: str
+    # info: a standing description; todo: something to look at; done: logged as
+    # already done, straight to the history with no marker on the card.
+    kind: NoteKind = "info"
+
+    @field_validator("body")
+    @classmethod
+    def _check_body(cls, value: str | None) -> str | None:
+        return _note_body(value)
+
+
+class PrinterNoteUpdate(IgnoresNullForRequiredColumns):
+    __orm_table__ = "hyyz17200_printer_note"
+
+    body: str | None = None
+    kind: NoteKind | None = None
+
+    @field_validator("body")
+    @classmethod
+    def _check_body(cls, value: str | None) -> str | None:
+        return _note_body(value)
+
+
+class PrinterNoteResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    printer_id: int
+    kind: str
+    body: str
+    created_at: datetime | None
+    created_by: str | None
+    edited_at: datetime | None
+    edited_by: str | None
+    resolved_at: datetime | None
+    resolved_by: str | None
+
+
+class PrinterNoteSummary(BaseModel):
+    printer_id: int
+    todo_count: int
+    info_count: int
+    latest: str
+
+
+@router.get("/printers/notes/summary", response_model=list[PrinterNoteSummary])
+async def list_printer_note_summaries(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.MAINTENANCE_READ),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """Every printer with "info" or "todo" notes, for the card markers."""
+    return await printer_notes.summaries(db, scope.allows)
+
+
+async def _ensure_note_printer(db: AsyncSession, printer_id: int) -> None:
+    if await db.scalar(select(Printer.id).where(Printer.id == printer_id)) is None:
+        raise HTTPException(status_code=404, detail="Printer not found")
+
+
+async def _note_or_404(db: AsyncSession, printer_id: int, note_id: int):
+    note = await printer_notes.get_note(db, printer_id, note_id)
+    if note is None:
+        raise HTTPException(status_code=404, detail="Note not found")
+    return note
+
+
+@router.get("/printers/{printer_id}/notes", response_model=list[PrinterNoteResponse])
+async def list_printer_notes(
+    printer_id: int,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: User | None = RequirePrinterPermissionIfAuthEnabled(Permission.MAINTENANCE_READ),
+):
+    """A printer's notes: info, then todo, then done; each newest first."""
+    await _ensure_note_printer(db, printer_id)
+    return await printer_notes.list_notes(db, printer_id)
+
+
+@router.post("/printers/{printer_id}/notes", response_model=PrinterNoteResponse)
+async def add_printer_note(
+    printer_id: int,
+    body: PrinterNoteCreate,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User | None = RequirePrinterPermissionIfAuthEnabled(Permission.MAINTENANCE_CREATE),
+):
+    await _ensure_note_printer(db, printer_id)
+    return await printer_notes.add_note(db, printer_id, body.body, body.kind, user.username if user else None)
+
+
+@router.patch("/printers/{printer_id}/notes/{note_id}", response_model=PrinterNoteResponse)
+async def update_printer_note(
+    printer_id: int,
+    note_id: int,
+    body: PrinterNoteUpdate,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User | None = RequirePrinterPermissionIfAuthEnabled(Permission.MAINTENANCE_UPDATE),
+):
+    """Edit the text or change the kind (todo -> done resolves, done -> todo reopens)."""
+    note = await _note_or_404(db, printer_id, note_id)
+    return await printer_notes.update_note(db, note, body=body.body, kind=body.kind, by=user.username if user else None)
+
+
+@router.delete("/printers/{printer_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_printer_note(
+    printer_id: int,
+    note_id: int,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: User | None = RequirePrinterPermissionIfAuthEnabled(Permission.MAINTENANCE_DELETE),
+):
+    note = await _note_or_404(db, printer_id, note_id)
+    await printer_notes.delete_note(db, note)
 
 
 class MaintenanceJobSend(BaseModel):

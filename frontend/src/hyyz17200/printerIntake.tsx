@@ -9,6 +9,7 @@ import { useCalibrationCard } from './calibration/useCalibrationCard';
 import { useMaintenanceJob } from './maintenanceJob/useMaintenanceJob';
 import { INTAKE_STOPS_QUERY_KEY, listIntakeStops, setPrinterIntake } from './printerIntakeApi';
 import { usePrinterMove } from './printerMove';
+import { usePrinterNotes } from './printerNotes/usePrinterNotes';
 
 // Another browser may change it; this is how soon the card notices.
 const REFRESH_MS = 30_000;
@@ -22,12 +23,16 @@ const PRINT_BUTTON_STOPPED = '!bg-yellow-400 hover:!bg-yellow-300 !text-gray-900
 export interface Hyyz17200Intake {
   /** The queue sends this printer no new jobs. */
   stopped: boolean;
-  /** The card menu's toggle, then "Move to location" and "Send maintenance G-code".
+  /** The card menu's toggle, then "Move to location", "Send maintenance G-code"
+   *  and "Notes".
    *  Closes the menu through `onMenuClose`. */
   menuItem: ReactNode;
   /** The pills for the M and larger badge row: not taking jobs, and a batch
    *  calibration's place. Nothing when neither applies. */
   pill: ReactNode;
+  /** Next to the printer's name in every card size, the S card included: the
+   *  notes marker. Nothing when the printer has no notes to show. */
+  nameBadge: ReactNode;
   /** Classes for the Print button, or `undefined` for upstream's green. */
   printButtonClass: string | undefined;
   printButtonTitle: string | undefined;
@@ -58,6 +63,8 @@ export function useHyyz17200Intake(
   const move = usePrinterMove(printer, onMenuClose);
   // And "Send maintenance G-code".
   const maintenance = useMaintenanceJob(printer, onMenuClose);
+  // And the notes, plus their marker beside the name.
+  const notes = usePrinterNotes(printer, onMenuClose);
 
   const { data } = useQuery({
     queryKey: INTAKE_STOPS_QUERY_KEY,
@@ -105,6 +112,7 @@ export function useHyyz17200Intake(
       {intakeMenuItem}
       {move.menuItem}
       {maintenance.menuItem}
+      {notes.menuItem}
     </>
   );
 
@@ -161,6 +169,7 @@ export function useHyyz17200Intake(
     stopped,
     menuItem,
     pill,
+    nameBadge: notes.badge,
     printButtonClass: stopped ? PRINT_BUTTON_STOPPED : undefined,
     printButtonTitle: stopped ? t('hyyz17200.printerIntake.printButtonTitle') : undefined,
     guard,
@@ -170,6 +179,7 @@ export function useHyyz17200Intake(
         {calibration.dialog}
         {move.dialog}
         {maintenance.dialog}
+        {notes.dialog}
       </>
     ),
   };
