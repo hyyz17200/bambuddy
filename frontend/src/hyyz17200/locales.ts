@@ -308,6 +308,24 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         },
       },
     },
+    slotPreference: {
+      title: 'Slot Preference',
+      description:
+        'When several AMS slots hold the same spool (two slots set up for AMS filament backup, say), the queue normally takes the lowest-numbered one. With this on it takes the one already loaded in the toolhead, so the print starts without a filament change and one spool is used up before the next.',
+      enabled: 'Prefer the loaded slot',
+      enabledHint: 'Off: among identical spools the lowest-numbered slot is used, as in the original.',
+      ruleOrder:
+        'First choice is the slot loaded now. With nothing loaded (after an unload), it is the slot loaded last, which is remembered across restarts.',
+      ruleSameSpool:
+        'A slot is only swapped for one holding the same material, colour and filament preset. A job never gets a different filament, and the other colours of a multi-colour job stay where they were.',
+      ruleWhere:
+        'Applies to every job the queue sends, whether it was aimed at one printer or at any printer of a model, and to maintenance G-code. Only AMS slots count, not the external spool.',
+      rulePreferLowest:
+        'On printers where "Prefer lowest remaining filament" applies (the setting is on and AMS filament backup is on), that setting decides instead.',
+      save: 'Save',
+      saved: 'Saved.',
+      saveFailed: 'Could not save.',
+    },
     plateClear: {
       title: 'Plate-clear confirmation',
       description:
@@ -900,6 +918,23 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
           print_started: '开始了新的打印',
         },
       },
+    },
+    slotPreference: {
+      title: '槽位优先',
+      description:
+        '几个 AMS 槽位装着同一种料时（比如为 AMS 备用料设了两个同色槽位），队列原本总是选序号最小的那个。打开后改选工具头里正装着的那个，开打前不用换料，而且先用完一卷再用下一卷。',
+      enabled: '优先用已装载的槽位',
+      enabledHint: '关闭时，同一种料选序号最小的槽位，和原版一样。',
+      ruleOrder: '首选当前装载的槽位。没有装载时（比如退料之后），选上一次装载的槽位，重启后也记得。',
+      ruleSameSpool:
+        '只在材料、颜色、耗材预设都相同的槽位之间替换。任务永远不会换成别的料，多色任务的其他颜色也不变。',
+      ruleWhere:
+        '对队列派出的所有任务生效，不管是指定打印机的还是“任意某型号”的，也包括维护 G-code。只算 AMS 槽位，不含外挂料盘。',
+      rulePreferLowest:
+        '在“Prefer lowest remaining filament”生效的打印机上（设置已开启且打印机开着 AMS 备用料），由那个设置决定。',
+      save: '保存',
+      saved: '已保存。',
+      saveFailed: '保存失败。',
     },
     plateClear: {
       title: '清板确认',

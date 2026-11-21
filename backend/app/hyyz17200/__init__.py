@@ -11,12 +11,13 @@ from backend.app.hyyz17200.api import router
 def register(app: FastAPI) -> None:
     """Add the fork's routes and background work. Called from main.py with the
     upstream routers, after the app (and its lifespan) is built."""
-    from backend.app.hyyz17200 import maintenance_jobs, printer_import, slice_as_designed
+    from backend.app.hyyz17200 import maintenance_jobs, printer_import, slice_as_designed, slot_preference
 
     app.include_router(router, prefix=settings.api_prefix)
     slice_as_designed.install()
     printer_import.install()
     maintenance_jobs.install()
+    slot_preference.install()
     _wrap_lifespan(app)
 
 
@@ -29,15 +30,23 @@ def _wrap_lifespan(app: FastAPI) -> None:
 
     @asynccontextmanager
     async def lifespan(app_: FastAPI):
-        from backend.app.hyyz17200 import auto_unload, calibration_batch, printer_scan, slice_as_designed
+        from backend.app.hyyz17200 import (
+            auto_unload,
+            calibration_batch,
+            printer_scan,
+            slice_as_designed,
+            slot_preference,
+        )
 
         async with upstream(app_) as state:
             await _apply_settings()
             await calibration_batch.resume_at_startup()
             auto_unload.runner.start()
+            slot_preference.runner.start()
             try:
                 yield state
             finally:
+                slot_preference.runner.stop()
                 auto_unload.runner.stop()
                 calibration_batch.runner.stop()
                 slice_as_designed.runner.stop()
