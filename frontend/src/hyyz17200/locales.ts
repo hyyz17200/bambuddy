@@ -328,6 +328,20 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
       saved: 'Saved.',
       saveFailed: 'Could not save.',
     },
+    quickButtons: {
+      title: 'Quick Buttons',
+      description:
+        'Shortcut buttons that stay on screen. Upstream puts Select at the top of the printer page, so you have to scroll back up to reach it, and gives the red bug-report button a permanent spot.',
+      select_button: 'Quick Select button on the Printers page',
+      select_buttonHint:
+        'PC: a round button in the bottom-right corner, hidden while selecting (the selection toolbar has its own close button). Phone or narrow window: a button in the top bar, right of the camera. Card view only.',
+      hide_bug_report: 'Hide the red bug-report button',
+      hide_bug_reportHint:
+        'Removes the round button in the bottom-right corner on a PC and the one in the top bar on a phone. While it is hidden there is no way to start a bug report; turn this off to get it back.',
+      save: 'Save',
+      saved: 'Saved.',
+      saveFailed: 'Could not save.',
+    },
     sdReuse: {
       title: 'SD Card Reuse',
       description:
@@ -1065,6 +1079,18 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         '对队列派出的所有任务生效，不管是指定打印机的还是“任意某型号”的，也包括维护 G-code。只算 AMS 槽位，不含外挂料盘。',
       rulePreferLowest:
         '在“Prefer lowest remaining filament”生效的打印机上（设置已开启且打印机开着 AMS 备用料），由那个设置决定。',
+      save: '保存',
+      saved: '已保存。',
+      saveFailed: '保存失败。',
+    },
+    quickButtons: {
+      title: '快捷按钮',
+      description: '始终留在屏幕上的快捷按钮。上游的“选择”在打印机页顶部，要滚回去才能点到；红色的 bug 报告按钮却一直占着位置。',
+      select_button: '打印机页的快捷“选择”按钮',
+      select_buttonHint:
+        'PC：右下角一个圆形按钮，进入多选后隐藏（多选工具栏自己有关闭按钮）。手机或窄窗口：顶栏摄像头按钮右边。只在卡片视图显示。',
+      hide_bug_report: '隐藏红色 bug 报告按钮',
+      hide_bug_reportHint: '去掉 PC 右下角的圆形按钮和手机顶栏的按钮。隐藏期间无法发起 bug 报告，要用时关掉这个开关。',
       save: '保存',
       saved: '已保存。',
       saveFailed: '保存失败。',

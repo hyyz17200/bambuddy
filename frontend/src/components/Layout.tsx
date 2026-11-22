@@ -39,6 +39,8 @@ import {
 } from '../utils/sidebarLayout';
 
 import { hyyz17200NavItems } from '../hyyz17200/nav';
+import { useHyyz17200HideBugReport } from '../hyyz17200/quickButtons/quickButtonsSettings';
+import { Hyyz17200HeaderSelect } from '../hyyz17200/quickButtons/QuickButtons';
 
 interface NavItem {
   id: string;
@@ -102,6 +104,7 @@ export function Layout() {
   // floating disc shows that itself; the compact header's button and the
   // debug-logging banner need telling.
   const [bugReportLogging, setBugReportLogging] = useState(false);
+  const hyyz17200HideBugReport = useHyyz17200HideBugReport(); // hyyz17200: quick buttons
   // The camera list (#2737), also opened with the C key: from the Printers row
   // of the sidebar, or from the compact header when the sidebar is a drawer.
   const [cameraListOpen, setCameraListOpen] = useState(false);
@@ -639,8 +642,9 @@ export function Layout() {
           <div className="ml-auto">
             <CameraLauncher placement="down" open={cameraListOpen} onOpenChange={setCameraListOpen} />
           </div>
+          <Hyyz17200HeaderSelect /* hyyz17200: quick buttons */ />
           {/* Bug report — the compact-layout home of the floating bubble. */}
-          <button
+          {!hyyz17200HideBugReport && <button
             onClick={() => setBugReportOpen(true)}
             className={`p-2 -mr-2 rounded-lg hover:bg-bambu-dark-tertiary transition-colors ${
               bugReportLogging ? 'text-amber-500' : 'text-red-500'
@@ -649,7 +653,7 @@ export function Layout() {
             aria-label={bugReportLogging ? t('bugReport.resumeReport') : t('bugReport.title')}
           >
             <Bug className={`w-5 h-5 ${bugReportLogging ? 'animate-pulse' : ''}`} />
-          </button>
+          </button>}
         </header>
       )}
 
@@ -1370,7 +1374,7 @@ export function Layout() {
           z-50 panel at the header's level and bury it under every ordinary
           modal in the app. */}
       <BugReportBubble
-        showTrigger={!isSidebarCompact}
+        showTrigger={!isSidebarCompact && !hyyz17200HideBugReport}
         open={bugReportOpen}
         onOpenChange={setBugReportOpen}
         onLoggingChange={setBugReportLogging}

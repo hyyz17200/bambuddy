@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { i18nReady, localeBackend } from '../../i18n';
 import i18n from '../../i18n';
+import layoutSource from '../../components/Layout.tsx?raw';
 import fileManagerSource from '../../pages/FileManagerPage.tsx?raw';
 import printersPageSource from '../../pages/PrintersPage.tsx?raw';
 
@@ -38,5 +39,15 @@ describe('hyyz17200 mount points', () => {
 
   it('keeps the notes marker beside the printer name', () => {
     expect(printersPageSource).toContain('{hyyz17200Intake.nameBadge');
+  });
+
+  it('keeps the quick Select toggle lent from the printer page', () => {
+    expect(printersPageSource).toContain('useHyyz17200SelectToggle(selectionMode,');
+  });
+
+  it('keeps the quick buttons in the Layout', () => {
+    expect(layoutSource).toContain('<Hyyz17200HeaderSelect');
+    expect(layoutSource).toContain('{!hyyz17200HideBugReport && <button');
+    expect(layoutSource).toContain('showTrigger={!isSidebarCompact && !hyyz17200HideBugReport}');
   });
 });

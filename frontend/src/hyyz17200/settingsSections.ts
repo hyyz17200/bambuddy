@@ -8,6 +8,7 @@ import {
   HardDrive,
   Layers,
   LayoutGrid,
+  MousePointerClick,
   Palette,
   Repeat,
   Undo2,
@@ -19,6 +20,7 @@ import { HiddenFaultsSection } from './HiddenFaultsSection';
 import { MaintenanceSection } from './maintenanceJob/MaintenanceSection';
 import { PlateClearSection } from './PlateClearSection';
 import { PlateCountSection } from './plateCount/PlateCountSection';
+import { QuickButtonsSection } from './quickButtons/QuickButtonsSection';
 import { QuickColorsSection } from './QuickColorsSection';
 import { SdReuseSection } from './SdReuseSection';
 import { SlotPreferenceSection } from './SlotPreferenceSection';
@@ -37,6 +39,7 @@ export const enhancedSettingsSections: {
   { id: 'hidden-faults', icon: BellOff, titleKey: 'hyyz17200.hiddenFaults.title', Component: HiddenFaultsSection },
   { id: 'wide-grid', icon: LayoutGrid, titleKey: 'hyyz17200.wideGrid.title', Component: WideGridSection },
   { id: 'cam-wall', icon: Camera, titleKey: 'hyyz17200.camWall.settings.title', Component: CamWallSection },
+  { id: 'quick-buttons', icon: MousePointerClick, titleKey: 'hyyz17200.quickButtons.title', Component: QuickButtonsSection },
   { id: 'tab-title', icon: AppWindow, titleKey: 'hyyz17200.tabTitle.title', Component: TabTitleSection },
   { id: 'quick-colors', icon: Palette, titleKey: 'hyyz17200.quickColors.title', Component: QuickColorsSection },
   { id: 'auto-unload', icon: Undo2, titleKey: 'hyyz17200.autoUnload.title', Component: AutoUnloadSection },
