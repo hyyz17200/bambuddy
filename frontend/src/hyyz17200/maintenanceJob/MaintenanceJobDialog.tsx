@@ -60,6 +60,11 @@ export function MaintenanceJobDialog({ printer, onClose }: { printer: Maintenanc
   const [selected, setSelected] = useState<LibraryFileListItem | null>(null);
   // On by default: nothing from the queue follows a maintenance job until someone looks.
   const [stopIntake, setStopIntake] = useState(true);
+  // On by default: a maintenance file is usually a plate swap. Asked only on a
+  // printer with upstream's plate changer capacity set (#3575).
+  const [usesPlate, setUsesPlate] = useState(true);
+  const { data: printers } = useQuery({ queryKey: ['printers'], queryFn: api.getPrinters });
+  const plateCounted = printers?.find((p) => p.id === printer.id)?.plate_capacity != null;
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ENHANCED_SETTINGS_QUERY_KEY,
@@ -90,11 +95,12 @@ export function MaintenanceJobDialog({ printer, onClose }: { printer: Maintenanc
   );
 
   const mutation = useMutation({
-    mutationFn: ({ file, stop }: { file: LibraryFileListItem; stop: boolean }) =>
-      sendMaintenanceJob(printer.id, file.id, stop),
+    mutationFn: ({ file, stop, plate }: { file: LibraryFileListItem; stop: boolean; plate: boolean }) =>
+      sendMaintenanceJob(printer.id, file.id, stop, plate),
     onSuccess: (data, { file, stop }) => {
       queryClient.invalidateQueries({ queryKey: ['queue'] });
       queryClient.invalidateQueries({ queryKey: INTAKE_STOPS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: ['printers'] });
       showToast(
         t('hyyz17200.maintenance.sent', { file: file.print_name || file.filename, name: printer.name }),
         'success',
@@ -246,9 +252,24 @@ export function MaintenanceJobDialog({ printer, onClose }: { printer: Maintenanc
                 <span className="block text-xs text-bambu-gray">{t('hyyz17200.maintenance.stopIntakeHint')}</span>
               </span>
             </label>
+            {plateCounted && (
+              <label className="flex items-start gap-2 text-sm text-white cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={usesPlate}
+                  disabled={sending}
+                  onChange={(e) => setUsesPlate(e.target.checked)}
+                  className="mt-0.5 accent-bambu-green"
+                />
+                <span>
+                  <span className="block">{t('hyyz17200.maintenance.usesPlate')}</span>
+                  <span className="block text-xs text-bambu-gray">{t('hyyz17200.maintenance.usesPlateHint')}</span>
+                </span>
+              </label>
+            )}
             <button
               type="button"
-              onClick={() => mutation.mutate({ file: selected, stop: stopIntake })}
+              onClick={() => mutation.mutate({ file: selected, stop: stopIntake, plate: !plateCounted || usesPlate })}
               disabled={sending}
               className="self-end px-4 py-2 text-sm rounded-lg bg-bambu-green text-white hover:bg-bambu-green/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >

@@ -10,6 +10,7 @@ import { useCalibrationCard } from './calibration/useCalibrationCard';
 import { useMaintenanceJob } from './maintenanceJob/useMaintenanceJob';
 import { INTAKE_STOPS_QUERY_KEY, listIntakeStops, setPrinterIntake } from './printerIntakeApi';
 import { usePrinterMove } from './printerMove';
+import { usePlateCount } from './plateCount/usePlateCount';
 import { usePrinterNotes } from './printerNotes/usePrinterNotes';
 
 // Another browser may change it; this is how soon the card notices.
@@ -51,7 +52,15 @@ export interface Hyyz17200Intake {
 /** "Stop taking jobs" on one printer card. Unlike maintenance mode the printer
  *  stays connected and every control keeps working; only the queue skips it. */
 export function useHyyz17200Intake(
-  printer: { id: number; name: string; location?: string | null; model?: string | null },
+  printer: {
+    id: number;
+    name: string;
+    location?: string | null;
+    model?: string | null;
+    // Upstream's plate changer count (#3575), for "Set plate count…".
+    plate_capacity?: number | null;
+    plates_remaining?: number | null;
+  },
   onMenuClose: () => void,
 ): Hyyz17200Intake {
   const { t } = useTranslation();
@@ -71,6 +80,8 @@ export function useHyyz17200Intake(
   const maintenance = useMaintenanceJob(printer, onMenuClose);
   // And the notes, plus their marker beside the name.
   const notes = usePrinterNotes(printer, onMenuClose);
+  // And "Set plate count…" on upstream's plate changer count.
+  const plates = usePlateCount(printer, onMenuClose);
 
   const { data } = useQuery({
     queryKey: INTAKE_STOPS_QUERY_KEY,
@@ -119,6 +130,7 @@ export function useHyyz17200Intake(
       {move.menuItem}
       {maintenance.menuItem}
       {notes.menuItem}
+      {plates.menuItem}
     </>
   );
 
@@ -209,6 +221,7 @@ export function useHyyz17200Intake(
         {move.dialog}
         {maintenance.dialog}
         {notes.dialog}
+        {plates.dialog}
       </>
     ),
   };

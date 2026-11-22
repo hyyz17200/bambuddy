@@ -19,16 +19,18 @@ export function isMaintenanceFile(filename: string): boolean {
 }
 
 /** Sends the file now, and with `stopIntake` stops the printer taking queue
- *  jobs. Rejects with a Hyyz17200RequestError whose `detail` is a short code
+ *  jobs. With `usesPlate` false the job takes no plate off the plate count.
+ *  Rejects with a Hyyz17200RequestError whose `detail` is a short code
  *  (offline, busy, plate_clear, wrong_model, ...). */
 export async function sendMaintenanceJob(
   printerId: number,
   libraryFileId: number,
   stopIntake: boolean,
+  usesPlate = true,
 ): Promise<{ queue_item_id: number; intake_stopped: boolean }> {
   const response = await hyyz17200Request(`/printers/${printerId}/maintenance-job`, {
     method: 'POST',
-    body: JSON.stringify({ library_file_id: libraryFileId, stop_intake: stopIntake }),
+    body: JSON.stringify({ library_file_id: libraryFileId, stop_intake: stopIntake, uses_plate: usesPlate }),
   });
   return response.json();
 }

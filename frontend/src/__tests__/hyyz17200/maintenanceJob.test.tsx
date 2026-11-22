@@ -3,7 +3,7 @@
  * from the maintenance folder (subfolders included) and send it now.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { cleanup, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import { http, HttpResponse } from 'msw';
 import { server } from '../mocks/server';
 
@@ -103,12 +103,15 @@ function folder(id: number, name: string, children: unknown[] = []) {
 
 let folderId: number | null;
 let fileQueries: URLSearchParams[];
-let sends: { printerId: string; body: { library_file_id: number; stop_intake: boolean } }[];
+let sends: { printerId: string; body: { library_file_id: number; stop_intake: boolean; uses_plate?: boolean } }[];
+let plateCounted: boolean;
 let sendError: string | null;
 
 function renderPage() {
   server.use(
-    http.get('/api/v1/printers/', () => HttpResponse.json([mockPrinter])),
+    http.get('/api/v1/printers/', () =>
+      HttpResponse.json([{ ...mockPrinter, plate_capacity: plateCounted ? 10 : null, plates_remaining: plateCounted ? 5 : null }]),
+    ),
     http.get('/api/v1/printers/:id/status', () =>
       HttpResponse.json({
         connected: true,
@@ -159,6 +162,7 @@ describe('printer card — send maintenance G-code', () => {
     fileQueries = [];
     sends = [];
     sendError = null;
+    plateCounted = false;
     permissions.granted = ['printers:read', 'printers:control', 'queue:create'];
     // setup.ts stubs localStorage with no-ops; this test needs it to keep values.
     const store = new Map<string, string>();
@@ -197,7 +201,7 @@ describe('printer card — send maintenance G-code', () => {
     expect(within(dialog).queryByRole('checkbox', { name: /plate is clear/i })).toBeNull();
     fireEvent.click(within(dialog).getByRole('button', { name: 'Send now' }));
 
-    await waitFor(() => expect(sends).toEqual([{ printerId: '1', body: { library_file_id: 1, stop_intake: true } }]));
+    await waitFor(() => expect(sends).toEqual([{ printerId: '1', body: { library_file_id: 1, stop_intake: true, uses_plate: true } }]));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   });
 
@@ -208,7 +212,28 @@ describe('printer card — send maintenance G-code', () => {
     fireEvent.click(within(dialog).getByRole('checkbox', { name: /stop taking jobs after sending/i }));
     fireEvent.click(within(dialog).getByRole('button', { name: 'Send now' }));
 
-    await waitFor(() => expect(sends).toEqual([{ printerId: '1', body: { library_file_id: 1, stop_intake: false } }]));
+    await waitFor(() => expect(sends).toEqual([{ printerId: '1', body: { library_file_id: 1, stop_intake: false, uses_plate: true } }]));
+  });
+
+  it('asks whether the job uses a plate only where plates are counted', async () => {
+    renderPage();
+    let dialog = await openDialog();
+    fireEvent.click(await within(dialog).findByRole('button', { name: /Plate swap/ }));
+    expect(within(dialog).queryByRole('checkbox', { name: /uses a plate/i })).toBeNull();
+    cleanup();
+
+    plateCounted = true;
+    renderPage();
+    dialog = await openDialog();
+    fireEvent.click(await within(dialog).findByRole('button', { name: /Plate swap/ }));
+    const box = (await within(dialog).findByRole('checkbox', { name: /uses a plate/i })) as HTMLInputElement;
+    expect(box.checked).toBe(true);
+    fireEvent.click(box);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Send now' }));
+
+    await waitFor(() =>
+      expect(sends).toEqual([{ printerId: '1', body: { library_file_id: 1, stop_intake: true, uses_plate: false } }]),
+    );
   });
 
   it('stays open and says why when the printer refuses', async () => {

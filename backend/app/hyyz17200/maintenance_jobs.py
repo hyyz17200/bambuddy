@@ -40,12 +40,24 @@ main.py's hook in plate_clear_hook.py). A failed or cancelled one does.
 ``stop_intake`` (on by default in the dialog) stops the printer taking queue
 jobs once the job is on its way, so nothing follows it before someone looks.
 
+Upstream's plate changer count (#3575) is kept, with two exceptions for these
+jobs (both wrappers in :func:`install`):
+
+- an empty plate changer still takes maintenance G-code (a swap file is how a
+  plate gets back onto the bed remotely): upstream's ``_plate_changer_blocks_dispatch``
+  answers "go" for the maintenance job being dispatched, unless the printer's
+  last print is still being closed out;
+- ``uses_plate`` (on by default) is whether the job's completion takes a plate
+  off. Unticked, upstream's ``consume_auto_cleared_plate`` is skipped for it.
+
 Nothing about the file's G-code is checked: what it does is the user's choice.
 """
 
 import asyncio
 import json
 import logging
+import sys
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from typing import Any
 
@@ -81,6 +93,12 @@ class MaintenanceSettings(BaseModel):
 
 _locks: dict[asyncio.AbstractEventLoop, asyncio.Lock] = {}
 
+# The printer whose maintenance job this task is dispatching (set in _dispatch).
+_dispatching: ContextVar[int | None] = ContextVar("hyyz17200_maintenance_dispatching", default=None)
+# The completion main._close_out_print is handling (set by its wrapper), for the
+# plate count wrapper, which upstream calls with the printer id only.
+_completion: ContextVar[tuple[int, dict] | None] = ContextVar("hyyz17200_maintenance_completion", default=None)
+
 
 def _lock() -> asyncio.Lock:
     """One lock per event loop: tests run several, and a lock belongs to one."""
@@ -92,19 +110,84 @@ def _lock() -> asyncio.Lock:
 
 
 def install() -> None:
-    """Run every queue pass under the send lock. Idempotent."""
+    """Run every queue pass under the send lock, and fit upstream's plate changer
+    count (#3575) to maintenance jobs. Idempotent."""
     from backend.app.services.print_scheduler import scheduler
 
     current = scheduler.check_queue
-    if getattr(current, "hyyz17200", False) is True:
-        return
+    if getattr(current, "hyyz17200", False) is not True:
 
-    async def check_queue() -> bool:
-        async with _lock():
-            return await current()
+        async def check_queue() -> bool:
+            async with _lock():
+                return await current()
 
-    check_queue.hyyz17200 = True
-    scheduler.check_queue = check_queue
+        check_queue.hyyz17200 = True
+        scheduler.check_queue = check_queue
+
+    blocks = scheduler._plate_changer_blocks_dispatch
+    if getattr(blocks, "hyyz17200", False) is not True:
+
+        async def plate_changer_blocks_dispatch(db: AsyncSession, printer_id: int) -> bool:
+            if _dispatching.get() == printer_id:
+                from backend.app.services.plate_changer import is_count_pending
+
+                # Out of plates is no reason to hold maintenance G-code; a print
+                # still being closed out is: the queue waits for it as well.
+                return is_count_pending(printer_id)
+            return await blocks(db, printer_id)
+
+        plate_changer_blocks_dispatch.hyyz17200 = True
+        plate_changer_blocks_dispatch.__wrapped__ = blocks
+        scheduler._plate_changer_blocks_dispatch = plate_changer_blocks_dispatch
+
+    main = sys.modules.get("backend.app.main")
+    if main is None:
+        import backend.app.main as main
+    if getattr(main._close_out_print, "hyyz17200", False) is not True:
+        main._close_out_print = _wrap_close_out(main._close_out_print)
+    if getattr(main.consume_auto_cleared_plate, "hyyz17200", False) is not True:
+        main.consume_auto_cleared_plate = _wrap_consume(main.consume_auto_cleared_plate)
+
+
+def _wrap_close_out(original):
+    async def close_out_print(printer_id: int, data: dict):
+        token = _completion.set((printer_id, data))
+        try:
+            return await original(printer_id, data)
+        finally:
+            _completion.reset(token)
+
+    close_out_print.hyyz17200 = True
+    close_out_print.__wrapped__ = original
+    return close_out_print
+
+
+def _wrap_consume(original):
+    async def consume_auto_cleared_plate(printer_id: int, *args, **kwargs):
+        completion = _completion.get()
+        if completion is not None and completion[0] == printer_id:
+            try:
+                async with async_session() as db:
+                    dispatch = await _finishing_dispatch(db, printer_id, completion[1])
+                    skip = dispatch is not None and not dispatch.uses_plate
+            except Exception:
+                logger.warning("hyyz17200 maintenance: plate check failed for printer %s", printer_id, exc_info=True)
+                skip = False
+            if skip:
+                from backend.app.services.plate_changer import clear_count_pending
+
+                clear_count_pending(printer_id)
+                logger.info(
+                    "hyyz17200 maintenance: printer %s finished maintenance G-code sent as not using a plate; "
+                    "plate count left as it was",
+                    printer_id,
+                )
+                return None
+        return await original(printer_id, *args, **kwargs)
+
+    consume_auto_cleared_plate.hyyz17200 = True
+    consume_auto_cleared_plate.__wrapped__ = original
+    return consume_auto_cleared_plate
 
 
 async def in_folder(db: AsyncSession, folder_id: int, file_folder_id: int | None) -> bool:
@@ -155,6 +238,7 @@ async def send(
     library_file_id: int,
     stop_intake: bool,
     *,
+    uses_plate: bool = True,
     current_user: Any,
     printer_scope: Any,
     review_required: bool,
@@ -233,7 +317,7 @@ async def send(
         )
         item_id = created.id
         await _map_filaments(db, printer_id, item_id)
-        await _record(db, item_id)
+        await _record(db, item_id, uses_plate)
         _launch(item_id, printer_id)
         intake_stopped = stop_intake and await _stop_intake(db, printer_id, getattr(current_user, "username", None))
     finally:
@@ -249,9 +333,10 @@ async def send(
     return item_id, intake_stopped
 
 
-async def _record(db: AsyncSession, item_id: int) -> None:
+async def _record(db: AsyncSession, item_id: int, uses_plate: bool = True) -> None:
     """Mark the job as maintenance, so its completion leaves the plate-clear flag
-    alone. A failure only logs: the completion then raises the flag as usual."""
+    alone (and the plate count, without ``uses_plate``). A failure only logs: the
+    completion then raises the flag and takes a plate off as usual."""
     try:
         open_jobs = select(PrintQueueItem.id).where(PrintQueueItem.status.in_(_OPEN_STATUSES))
         await db.execute(
@@ -259,7 +344,7 @@ async def _record(db: AsyncSession, item_id: int) -> None:
                 (MaintenanceDispatch.queue_item_id == item_id) | MaintenanceDispatch.queue_item_id.not_in(open_jobs)
             )
         )
-        db.add(MaintenanceDispatch(queue_item_id=item_id))
+        db.add(MaintenanceDispatch(queue_item_id=item_id, uses_plate=uses_plate))
         await db.commit()
     except Exception:
         logger.warning("hyyz17200 maintenance: could not mark queue item %s", item_id, exc_info=True)
@@ -279,11 +364,17 @@ async def _stop_intake(db: AsyncSession, printer_id: int, by: str | None) -> boo
 
 async def skips_plate_clear(db: AsyncSession, printer_id: int, data: dict) -> bool:
     """This completion is a maintenance job's, so the plate-clear flag stays as
-    it was. Called by plate_clear_hook.skips_plate_clear for a completed print.
+    it was. Called by plate_clear_hook.skips_plate_clear for a completed print."""
+    return await _finishing_dispatch(db, printer_id, data) is not None
+
+
+async def _finishing_dispatch(db: AsyncSession, printer_id: int, data: dict) -> MaintenanceDispatch | None:
+    """The maintenance job this completion belongs to, or None.
 
     The printer must have exactly one queue job printing, sent as maintenance,
     and the completion must name its file. Upstream's own matching lets an
-    unknown name through so the queue does not wedge; here it raises the flag.
+    unknown name through so the queue does not wedge; here it counts as not
+    maintenance (the plate-clear flag goes up, a plate is taken off).
     """
     # Deferred: main imports this package, and these helpers live in main.
     from backend.app.main import _queue_item_dispatched_name, _subtask_name_from_filename, _subtask_names_match
@@ -300,20 +391,21 @@ async def skips_plate_clear(db: AsyncSession, printer_id: int, data: dict) -> bo
         .all()
     )
     if len(printing) != 1:
-        return False
+        return None
     item = printing[0]
-    if await db.get(MaintenanceDispatch, item.id) is None:
-        return False
+    dispatch = await db.get(MaintenanceDispatch, item.id)
+    if dispatch is None:
+        return None
     expected = await _queue_item_dispatched_name(db, item)
     if not expected:
-        return False
+        return None
     # The printer echoes the subtask name; a completion synthesised at reconnect
     # carries the archive's file name, and may carry a different print name.
     observed = [
         data.get("subtask_name") or "",
         _subtask_name_from_filename((data.get("filename") or "").rsplit("/", 1)[-1]),
     ]
-    return any(name and _subtask_names_match(expected, name) for name in observed)
+    return dispatch if any(name and _subtask_names_match(expected, name) for name in observed) else None
 
 
 async def _map_filaments(db: AsyncSession, printer_id: int, item_id: int) -> None:
@@ -346,6 +438,8 @@ def _launch(item_id: int, printer_id: int) -> None:
 async def _dispatch(item_id: int, printer_id: int) -> None:
     from backend.app.services.print_scheduler import scheduler
 
+    # This task's own context: upstream's plate changer guard lets it through.
+    _dispatching.set(printer_id)
     try:
         await scheduler._dispatch_one(item_id, printer_id)
     finally:

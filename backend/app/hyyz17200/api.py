@@ -384,6 +384,8 @@ class MaintenanceJobSend(BaseModel):
     library_file_id: int
     # Stop the printer taking queue jobs once the job is on its way.
     stop_intake: bool = True
+    # Take a plate off upstream's plate changer count (#3575) when the job finishes.
+    uses_plate: bool = True
 
 
 @router.post("/printers/{printer_id}/maintenance-job")
@@ -415,6 +417,7 @@ async def send_maintenance_job(
         printer_id,
         body.library_file_id,
         body.stop_intake,
+        uses_plate=body.uses_plate,
         current_user=current_user,
         printer_scope=printer_scope,
         review_required=review_required,
