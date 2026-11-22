@@ -11,13 +11,15 @@ treats those printers as taken: a job pinned to one waits, a job for "any
 Besides the printers not taking jobs, that includes the ones auto_unload.py is
 unloading for the few minutes it takes, which the printer still reports idle,
 and the ones a batch calibration is waiting to calibrate or calibrating. Those
-two are in memory and never change the printer's own "stop taking jobs".
+two are in memory and never change the printer's own "stop taking jobs". And
+the printers plate_count.py holds because their plate changer has no clean
+plate left.
 """
 
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.hyyz17200 import auto_unload, calibration_batch
+from backend.app.hyyz17200 import auto_unload, calibration_batch, plate_count
 from backend.app.hyyz17200.models.printer_intake import PrinterIntakeStop
 from backend.app.models.printer import Printer
 
@@ -27,6 +29,11 @@ from backend.app.models.printer import Printer
 WAITING_SUFFIX = "(not taking jobs)"
 UNLOADING_SUFFIX = "(unloading filament)"
 CALIBRATING_SUFFIX = "(batch calibration)"
+NO_PLATES_SUFFIX = "(no clean plate left)"
+
+# The printers not taking jobs at the last queue pass, so a printer both stopped
+# and out of plates reads as stopped: that is the one someone chose.
+_stopped: frozenset[int] = frozenset()
 
 
 async def stopped_printer_ids(db: AsyncSession) -> set[int]:
@@ -39,8 +46,17 @@ async def stopped_printer_ids(db: AsyncSession) -> set[int]:
 
 async def queue_skipped_printer_ids(db: AsyncSession) -> set[int]:
     """What the queue leaves alone this pass: printers not taking jobs, printers
-    being unloaded, and printers in a running batch calibration."""
-    return await stopped_printer_ids(db) | auto_unload.busy_printer_ids() | calibration_batch.held_printer_ids()
+    being unloaded, printers in a running batch calibration, and printers out of
+    clean plates."""
+    global _stopped
+    stopped = await stopped_printer_ids(db)
+    _stopped = frozenset(stopped)
+    return (
+        stopped
+        | auto_unload.busy_printer_ids()
+        | calibration_batch.held_printer_ids()
+        | await plate_count.held_printer_ids(db)
+    )
 
 
 async def list_stops(db: AsyncSession) -> list[PrinterIntakeStop]:
@@ -69,4 +85,6 @@ def waiting_reason(printer_label: str, printer_id: int | None = None) -> str:
         return f"Busy: {printer_label} {UNLOADING_SUFFIX}"
     if printer_id is not None and calibration_batch.is_held(printer_id):
         return f"Busy: {printer_label} {CALIBRATING_SUFFIX}"
+    if printer_id is not None and plate_count.is_held(printer_id) and printer_id not in _stopped:
+        return f"Busy: {printer_label} {NO_PLATES_SUFFIX}"
     return f"Busy: {printer_label} {WAITING_SUFFIX}"

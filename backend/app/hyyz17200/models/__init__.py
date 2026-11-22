@@ -8,6 +8,7 @@ rather than adding columns to upstream's tables.
 from backend.app.hyyz17200.models.calibration import CalibrationBatch, CalibrationItem
 from backend.app.hyyz17200.models.hidden_fault import HiddenFault
 from backend.app.hyyz17200.models.maintenance_job import MaintenanceDispatch
+from backend.app.hyyz17200.models.plate_count import PlatePrinter, PlateRun
 from backend.app.hyyz17200.models.printer_intake import PrinterIntakeStop
 from backend.app.hyyz17200.models.printer_last_tray import PrinterLastTray
 from backend.app.hyyz17200.models.printer_note import PrinterNote
@@ -19,6 +20,8 @@ __all__ = [
     "HiddenFault",
     "Hyyz17200Setting",
     "MaintenanceDispatch",
+    "PlatePrinter",
+    "PlateRun",
     "PrinterIntakeStop",
     "PrinterLastTray",
     "PrinterNote",

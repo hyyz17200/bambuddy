@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { CircleDot, Download, Gauge, Hand, MapPin, RotateCw, Wrench } from 'lucide-react';
+import { CircleDot, Download, Gauge, Hand, Layers, MapPin, RotateCw, Wrench } from 'lucide-react';
 import { api } from '../../api/client';
 import type { Printer, PrinterMaintenanceOverview, PrinterStatus } from '../../api/client';
 import { Button } from '../../components/Button';
@@ -13,6 +13,8 @@ import { ACTIVE_PRINT_STATES } from '../../utils/printer';
 import { OPEN_STATUSES, useCalibrationBatch } from '../calibrationApi';
 import { CalibrationProgress } from '../calibration/CalibrationProgress';
 import { CalibrationStart } from '../calibration/CalibrationStart';
+import { getPlateOverview, PLATES_QUERY_KEY } from '../plateCount/api';
+import { BulkPlateDialog } from '../plateCount/BulkPlateDialog';
 import { INTAKE_STOPS_QUERY_KEY, listIntakeStops, setPrinterIntake } from '../printerIntakeApi';
 import { BulkExternalSpool } from './BulkExternalSpool';
 import { ChoiceDialog } from './ChoiceDialog';
@@ -22,7 +24,7 @@ import { runBatch, type BatchResult } from './runBatch';
 import { byLocation, byName, summarize } from './batchText';
 import { PrinterNameList } from './PrinterNameList';
 
-type Dialog = 'move' | 'maintenance' | 'intake' | 'refresh' | 'spool' | 'calibrate' | 'calibrationProgress';
+type Dialog = 'move' | 'maintenance' | 'intake' | 'plates' | 'refresh' | 'spool' | 'calibrate' | 'calibrationProgress';
 
 interface Props {
   selectedIds: Set<number>;
@@ -44,17 +46,21 @@ export function Hyyz17200BulkActions({ selectedIds, printers, disabled }: Props)
   const stopped = new Set(intakeStops?.map((s) => s.printer_id));
   const { data: calibration } = useCalibrationBatch();
   const calibrating = calibration?.status === 'running';
+  const { data: plateOverview } = useQuery({ queryKey: PLATES_QUERY_KEY, queryFn: getPlateOverview });
   const calibrated = calibration?.items.filter((i) => !OPEN_STATUSES.includes(i.status)).length ?? 0;
 
   const selected = byName(printers.filter((p) => selectedIds.has(p.id)));
   const statusOf = (id: number) => queryClient.getQueryData<PrinterStatus>(['printerStatus', id]);
   const canUpdate = hasPermission('printers:update');
   const canControl = hasPermission('printers:control');
+  const canClearPlate = hasPermission('printers:clear_plate');
   const busy = disabled || running || !selected.length;
 
   const inMaintenance = selected.filter((p) => p.is_active === false);
   const inService = selected.filter((p) => p.is_active !== false);
   const printingInService = inService.filter((p) => ACTIVE_PRINT_STATES.includes(statusOf(p.id)?.state ?? ''));
+  const countedIds = new Set(plateOverview?.printers.filter((p) => p.counted).map((p) => p.printer_id));
+  const plateCounted = selected.filter((p) => countedIds.has(p.id));
   const refreshable = selected.filter((p) => p.is_active !== false && statusOf(p.id)?.connected);
 
   const finish = (action: string, done: BatchResult<Printer, unknown>) => {
@@ -141,6 +147,24 @@ export function Hyyz17200BulkActions({ selectedIds, printers, disabled }: Props)
         <Hand className="w-3.5 h-3.5" />
         {t('hyyz17200.bulk.intake.button')}
       </Button>
+      {plateOverview?.enabled && (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => setDialog('plates')}
+          disabled={busy || !canClearPlate || !plateCounted.length}
+          title={
+            !canClearPlate
+              ? t('printers.permission.noControl')
+              : !plateCounted.length
+                ? t('hyyz17200.plateCount.bulk.noneCounted')
+                : undefined
+          }
+        >
+          <Layers className="w-3.5 h-3.5" />
+          {t('hyyz17200.plateCount.bulk.button')}
+        </Button>
+      )}
       <Button
         variant="secondary"
         size="sm"
@@ -236,6 +260,8 @@ export function Hyyz17200BulkActions({ selectedIds, printers, disabled }: Props)
           onCancel={() => setDialog(null)}
         />
       )}
+
+      {dialog === 'plates' && <BulkPlateDialog printers={selected} onClose={() => setDialog(null)} />}
 
       {dialog === 'refresh' && (
         <ConfirmModal

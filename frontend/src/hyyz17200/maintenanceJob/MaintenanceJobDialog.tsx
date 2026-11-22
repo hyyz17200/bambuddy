@@ -11,6 +11,7 @@ import { formatDuration } from '../../utils/date';
 import { isGcodeCompatible } from '../../utils/printer';
 import { mapModelCode } from '../../utils/printerModel';
 import { ENHANCED_SETTINGS_QUERY_KEY, getEnhancedSettings } from '../enhancedSettingsApi';
+import { getPlateOverview, PLATES_QUERY_KEY } from '../plateCount/api';
 import { INTAKE_STOPS_QUERY_KEY } from '../printerIntakeApi';
 import { Hyyz17200RequestError } from '../request';
 import { MAINTENANCE_SECTION, isMaintenanceFile, normalizeMaintenance, sendMaintenanceJob } from './maintenanceApi';
@@ -60,6 +61,11 @@ export function MaintenanceJobDialog({ printer, onClose }: { printer: Maintenanc
   const [selected, setSelected] = useState<LibraryFileListItem | null>(null);
   // On by default: nothing from the queue follows a maintenance job until someone looks.
   const [stopIntake, setStopIntake] = useState(true);
+  // On by default: a maintenance file is usually a plate swap. Asked only on a
+  // printer whose plates are counted.
+  const [usesPlate, setUsesPlate] = useState(true);
+  const { data: plateOverview } = useQuery({ queryKey: PLATES_QUERY_KEY, queryFn: getPlateOverview });
+  const plateCounted = !!plateOverview?.printers.find((p) => p.printer_id === printer.id)?.counted;
 
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ENHANCED_SETTINGS_QUERY_KEY,
@@ -90,11 +96,12 @@ export function MaintenanceJobDialog({ printer, onClose }: { printer: Maintenanc
   );
 
   const mutation = useMutation({
-    mutationFn: ({ file, stop }: { file: LibraryFileListItem; stop: boolean }) =>
-      sendMaintenanceJob(printer.id, file.id, stop),
+    mutationFn: ({ file, stop, plate }: { file: LibraryFileListItem; stop: boolean; plate: boolean }) =>
+      sendMaintenanceJob(printer.id, file.id, stop, plate),
     onSuccess: (data, { file, stop }) => {
       queryClient.invalidateQueries({ queryKey: ['queue'] });
       queryClient.invalidateQueries({ queryKey: INTAKE_STOPS_QUERY_KEY });
+      queryClient.invalidateQueries({ queryKey: PLATES_QUERY_KEY });
       showToast(
         t('hyyz17200.maintenance.sent', { file: file.print_name || file.filename, name: printer.name }),
         'success',
@@ -246,9 +253,24 @@ export function MaintenanceJobDialog({ printer, onClose }: { printer: Maintenanc
                 <span className="block text-xs text-bambu-gray">{t('hyyz17200.maintenance.stopIntakeHint')}</span>
               </span>
             </label>
+            {plateCounted && (
+              <label className="flex items-start gap-2 text-sm text-white cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={usesPlate}
+                  disabled={sending}
+                  onChange={(e) => setUsesPlate(e.target.checked)}
+                  className="mt-0.5 accent-bambu-green"
+                />
+                <span>
+                  <span className="block">{t('hyyz17200.maintenance.usesPlate')}</span>
+                  <span className="block text-xs text-bambu-gray">{t('hyyz17200.maintenance.usesPlateHint')}</span>
+                </span>
+              </label>
+            )}
             <button
               type="button"
-              onClick={() => mutation.mutate({ file: selected, stop: stopIntake })}
+              onClick={() => mutation.mutate({ file: selected, stop: stopIntake, plate: !plateCounted || usesPlate })}
               disabled={sending}
               className="self-end px-4 py-2 text-sm rounded-lg bg-bambu-green text-white hover:bg-bambu-green/80 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >

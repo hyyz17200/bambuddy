@@ -34,6 +34,7 @@ def _wrap_lifespan(app: FastAPI) -> None:
         from backend.app.hyyz17200 import (
             auto_unload,
             calibration_batch,
+            plate_count,
             printer_scan,
             slice_as_designed,
             slot_preference,
@@ -44,9 +45,11 @@ def _wrap_lifespan(app: FastAPI) -> None:
             await calibration_batch.resume_at_startup()
             auto_unload.runner.start()
             slot_preference.runner.start()
+            plate_count.runner.start()
             try:
                 yield state
             finally:
+                plate_count.runner.stop()
                 slot_preference.runner.stop()
                 auto_unload.runner.stop()
                 calibration_batch.runner.stop()

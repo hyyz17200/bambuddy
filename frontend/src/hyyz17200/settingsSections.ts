@@ -6,6 +6,7 @@ import {
   ClipboardCheck,
   FileCog,
   HardDrive,
+  Layers,
   LayoutGrid,
   Palette,
   Repeat,
@@ -17,6 +18,7 @@ import { CamWallSection } from './CamWallSection';
 import { HiddenFaultsSection } from './HiddenFaultsSection';
 import { MaintenanceSection } from './maintenanceJob/MaintenanceSection';
 import { PlateClearSection } from './PlateClearSection';
+import { PlateCountSection } from './plateCount/PlateCountSection';
 import { QuickColorsSection } from './QuickColorsSection';
 import { SdReuseSection } from './SdReuseSection';
 import { SlotPreferenceSection } from './SlotPreferenceSection';
@@ -41,5 +43,6 @@ export const enhancedSettingsSections: {
   { id: 'slot-preference', icon: Repeat, titleKey: 'hyyz17200.slotPreference.title', Component: SlotPreferenceSection },
   { id: 'maintenance', icon: FileCog, titleKey: 'hyyz17200.maintenance.settings.title', Component: MaintenanceSection },
   { id: 'plate-clear', icon: ClipboardCheck, titleKey: 'hyyz17200.plateClear.title', Component: PlateClearSection },
+  { id: 'plate-count', icon: Layers, titleKey: 'hyyz17200.plateCount.settings.title', Component: PlateCountSection },
   { id: 'sd-reuse', icon: HardDrive, titleKey: 'hyyz17200.sdReuse.title', Component: SdReuseSection },
 ];

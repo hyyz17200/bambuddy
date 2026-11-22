@@ -10,6 +10,7 @@ import { useCalibrationCard } from './calibration/useCalibrationCard';
 import { useMaintenanceJob } from './maintenanceJob/useMaintenanceJob';
 import { INTAKE_STOPS_QUERY_KEY, listIntakeStops, setPrinterIntake } from './printerIntakeApi';
 import { usePrinterMove } from './printerMove';
+import { usePlateCount } from './plateCount/usePlateCount';
 import { usePrinterNotes } from './printerNotes/usePrinterNotes';
 
 // Another browser may change it; this is how soon the card notices.
@@ -32,7 +33,7 @@ export interface Hyyz17200Intake {
    *  calibration's place. Nothing when neither applies. */
   pill: ReactNode;
   /** Next to the printer's name in every card size, the S card included: the
-   *  notes marker. Nothing when the printer has no notes to show. */
+   *  notes marker and the plate count. Nothing when neither applies. */
   nameBadge: ReactNode;
   /** A one-tap toggle for the card's footer row, left of the camera button,
    *  sized by the footer's own icon-button classes. Stops at once; resuming
@@ -71,6 +72,8 @@ export function useHyyz17200Intake(
   const maintenance = useMaintenanceJob(printer, onMenuClose);
   // And the notes, plus their marker beside the name.
   const notes = usePrinterNotes(printer, onMenuClose);
+  // And the plate count, with its refill button beside the name.
+  const plates = usePlateCount(printer, onMenuClose);
 
   const { data } = useQuery({
     queryKey: INTAKE_STOPS_QUERY_KEY,
@@ -119,6 +122,7 @@ export function useHyyz17200Intake(
       {move.menuItem}
       {maintenance.menuItem}
       {notes.menuItem}
+      {plates.menuItem}
     </>
   );
 
@@ -197,7 +201,13 @@ export function useHyyz17200Intake(
     stopped,
     menuItem,
     pill,
-    nameBadge: notes.badge,
+    nameBadge:
+      notes.badge || plates.badge ? (
+        <>
+          {notes.badge}
+          {plates.badge}
+        </>
+      ) : null,
     footerButton,
     printButtonClass: stopped ? PRINT_BUTTON_STOPPED : undefined,
     printButtonTitle: stopped ? t('hyyz17200.printerIntake.printButtonTitle') : undefined,
@@ -209,6 +219,7 @@ export function useHyyz17200Intake(
         {move.dialog}
         {maintenance.dialog}
         {notes.dialog}
+        {plates.dialog}
       </>
     ),
   };

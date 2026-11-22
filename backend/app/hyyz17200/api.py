@@ -28,6 +28,7 @@ from backend.app.hyyz17200 import (
     camera_frames,
     enhanced_settings,
     maintenance_jobs,
+    plate_count,
     printer_import,
     printer_intake,
     printer_notes,
@@ -384,6 +385,8 @@ class MaintenanceJobSend(BaseModel):
     library_file_id: int
     # Stop the printer taking queue jobs once the job is on its way.
     stop_intake: bool = True
+    # Take a plate off the printer's plate count when the job finishes.
+    uses_plate: bool = True
 
 
 @router.post("/printers/{printer_id}/maintenance-job")
@@ -415,6 +418,7 @@ async def send_maintenance_job(
         printer_id,
         body.library_file_id,
         body.stop_intake,
+        uses_plate=body.uses_plate,
         current_user=current_user,
         printer_scope=printer_scope,
         review_required=review_required,
@@ -431,6 +435,79 @@ async def _printers_in_scope(db: AsyncSession, printer_ids: list[int], scope: Pr
     if missing:
         raise HTTPException(status_code=404, detail=f"Printer not found: {', '.join(map(str, missing))}")
     return ids
+
+
+class PlateSet(BaseModel):
+    # Clean plates in the printer, the bed's included; null fills it to its capacity.
+    plates: int | None = Field(default=None, ge=0, le=plate_count.MAX_CAPACITY)
+
+
+class PlateSetMany(PlateSet):
+    printer_ids: list[int] = Field(min_length=1)
+
+
+class PlateConfig(BaseModel):
+    printer_ids: list[int] = Field(min_length=1)
+    # Left out (null): unchanged.
+    disabled: bool | None = None
+    capacity: int | None = Field(default=None, ge=1, le=plate_count.MAX_CAPACITY)
+    # Go back to the Enhanced Settings default capacity.
+    default_capacity: bool = False
+
+
+@router.get("/printers/plates")
+async def get_plate_counts(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # Everyone who sees a printer card needs this to draw its plate count.
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_READ),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """The plate count's settings, and per printer whether it is counted and its plates."""
+    return await plate_count.overview(db, scope.allows)
+
+
+@router.post("/printers/plates/set")
+async def set_plate_counts(
+    body: PlateSetMany,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # What the card's "plate cleared" button needs: both say the plates were dealt with.
+    user: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_CLEAR_PLATE),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """Refill several printers (the multi-select toolbar). Printers not counted are skipped."""
+    ids = await _printers_in_scope(db, body.printer_ids, scope)
+    done = await plate_count.set_plates(db, ids, body.plates, user.username if user else None)
+    return {"updated": done, "skipped": [pid for pid in ids if pid not in done]}
+
+
+@router.post("/printers/plates/config")
+async def configure_plate_counts(
+    body: PlateConfig,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.PRINTERS_UPDATE),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """Switch printers off or on for the plate count, and set their capacity."""
+    ids = await _printers_in_scope(db, body.printer_ids, scope)
+    await plate_count.configure(
+        db, ids, disabled=body.disabled, capacity=body.capacity, default_capacity=body.default_capacity
+    )
+    return {"updated": ids}
+
+
+@router.post("/printers/{printer_id}/plates")
+async def set_plate_count(
+    printer_id: int,
+    body: PlateSet,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    user: User | None = RequirePrinterPermissionIfAuthEnabled(Permission.PRINTERS_CLEAR_PLATE),
+):
+    """Refill one printer (the card's button), or set its plates (the card menu)."""
+    if await db.scalar(select(Printer.id).where(Printer.id == printer_id)) is None:
+        raise HTTPException(status_code=404, detail="Printer not found")
+    if not await plate_count.set_plates(db, [printer_id], body.plates, user.username if user else None):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="not_counted")
+    return {"updated": [printer_id]}
 
 
 @router.get("/calibration/batch")

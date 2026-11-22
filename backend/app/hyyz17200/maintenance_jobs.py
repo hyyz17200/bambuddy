@@ -40,6 +40,10 @@ main.py's hook in plate_clear_hook.py). A failed or cancelled one does.
 ``stop_intake`` (on by default in the dialog) stops the printer taking queue
 jobs once the job is on its way, so nothing follows it before someone looks.
 
+``uses_plate`` (on by default) lets plate_count.py take a plate off when the job
+finishes, as a plate-swap file does. A printer with no clean plate left still
+takes maintenance G-code: the queue's hold does not apply here.
+
 Nothing about the file's G-code is checked: what it does is the user's choice.
 """
 
@@ -56,7 +60,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.database import async_session
 from backend.app.core.tasks import spawn_background_task
-from backend.app.hyyz17200 import calibration_batch, printer_intake
+from backend.app.hyyz17200 import calibration_batch, plate_count, printer_intake
 from backend.app.hyyz17200.models.maintenance_job import MaintenanceDispatch
 from backend.app.models.library import LibraryFile, LibraryFolder
 from backend.app.models.print_queue import PrintQueueItem
@@ -155,6 +159,7 @@ async def send(
     library_file_id: int,
     stop_intake: bool,
     *,
+    uses_plate: bool = True,
     current_user: Any,
     printer_scope: Any,
     review_required: bool,
@@ -234,6 +239,8 @@ async def send(
         item_id = created.id
         await _map_filaments(db, printer_id, item_id)
         await _record(db, item_id)
+        if not uses_plate:
+            await _exempt_from_plate_count(db, item_id, printer_id)
         _launch(item_id, printer_id)
         intake_stopped = stop_intake and await _stop_intake(db, printer_id, getattr(current_user, "username", None))
     finally:
@@ -263,6 +270,17 @@ async def _record(db: AsyncSession, item_id: int) -> None:
         await db.commit()
     except Exception:
         logger.warning("hyyz17200 maintenance: could not mark queue item %s", item_id, exc_info=True)
+        await db.rollback()
+
+
+async def _exempt_from_plate_count(db: AsyncSession, item_id: int, printer_id: int) -> None:
+    """A failure only logs: the job then takes a plate off when it finishes."""
+    try:
+        await plate_count.exempt(db, item_id, printer_id)
+    except Exception:
+        logger.warning(
+            "hyyz17200 maintenance: could not keep queue item %s out of the plate count", item_id, exc_info=True
+        )
         await db.rollback()
 
 
