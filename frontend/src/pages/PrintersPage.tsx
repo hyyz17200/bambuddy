@@ -181,6 +181,7 @@ import { savedCamWallControlsMode, saveCamWallControlsMode, type CamWallControls
 import { hyyz17200WideGrid } from '../hyyz17200/wideGrid';
 import { INTAKE_STOPPED_PIP, useHyyz17200Intake } from '../hyyz17200/printerIntake';
 import { PrinterImportButton } from '../hyyz17200/printerImport/PrinterImportButton'; // hyyz17200: bulk add
+import { useHyyz17200SelectToggle } from '../hyyz17200/quickButtons/selectToggle';
 import { ContextMenu, type ContextMenuItem } from '../components/ContextMenu';
 import { MQTTDebugModal } from '../components/MQTTDebugModal';
 import { HMSErrorModal, filterKnownHMSErrors, isSevereHMSError } from '../components/HMSErrorModal';
@@ -9954,6 +9955,7 @@ export function PrintersPage() {
     setSelectedPrinterIds(new Set());
     setIsSelectionMode(false);
   }, []);
+  useHyyz17200SelectToggle(selectionMode, () => (selectionMode ? clearSelection() : setIsSelectionMode(true)), hasPermission('printers:control') && pageView === 'cards'); // hyyz17200: quick Select button
 
   // Escape key exits selection mode
   useEffect(() => {

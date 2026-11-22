@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { ENHANCED_SETTINGS_QUERY_KEY, getEnhancedSettings } from './enhancedSettingsApi';
 import { applyCamWall } from './camWallSettings';
+import { applyQuickButtons } from './quickButtons/quickButtonsSettings';
 import { applyQuickColors } from './quickColors';
 import { applyWideGrid } from './wideGrid';
 
@@ -25,6 +26,7 @@ export function EnhancedSettingsSync() {
     applyWideGrid(data.wide_grid);
     applyQuickColors(data.quick_colors);
     applyCamWall(data.cam_wall);
+    applyQuickButtons(data.quick_buttons);
   }, [data]);
 
   return null;

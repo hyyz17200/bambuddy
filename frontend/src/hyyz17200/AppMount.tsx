@@ -1,5 +1,6 @@
 import { EnhancedSettingsSync } from './EnhancedSettingsSync';
 import { HiddenFaultsSync } from './HiddenFaultsSync';
+import { Hyyz17200FloatingSelect } from './quickButtons/QuickButtons';
 import { SliceAsDesignedPanel } from './sliceAsDesigned/SliceAsDesignedPanel';
 import { TabTitleSync } from './tabTitle/TabTitleSync';
 
@@ -12,6 +13,7 @@ export function Hyyz17200AppMount() {
       <EnhancedSettingsSync />
       <SliceAsDesignedPanel />
       <TabTitleSync />
+      <Hyyz17200FloatingSelect />
     </>
   );
 }

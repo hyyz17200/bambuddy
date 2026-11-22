@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.hyyz17200 import auto_unload, camera_frames, sd_reuse, slot_preference
 from backend.app.hyyz17200.maintenance_jobs import MaintenanceSettings
 from backend.app.hyyz17200.models.setting import Hyyz17200Setting
+from backend.app.hyyz17200.quick_buttons import QuickButtonSettings
 from backend.app.hyyz17200.quick_colors import QuickColorSettings
 from backend.app.hyyz17200.tab_title import TabTitleSettings
 from backend.app.hyyz17200.wide_grid import WideGridSettings
@@ -35,6 +36,7 @@ SECTIONS: dict[str, type[BaseModel]] = {
     "slot_preference": slot_preference.SlotPreferenceSettings,
     "tab_title": TabTitleSettings,
     "sd_reuse": sd_reuse.SdReuseSettings,
+    "quick_buttons": QuickButtonSettings,
 }
 
 APPLY: dict[str, Callable[[BaseModel], None]] = {
