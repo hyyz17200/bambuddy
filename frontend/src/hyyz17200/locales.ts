@@ -557,6 +557,35 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         saveFailed: 'Could not save.',
       },
     },
+    cameraLed: {
+      title: 'Auto Camera LED',
+      description:
+        'Keeps the chamber light on for the whole print and switches it off once the printer is idle. The camera gets steady light instead of a flash for every snapshot (an A1 camera takes several seconds to adjust its exposure after the light comes on), and the LED is not left on between jobs.',
+      enabled: 'On while printing, off when idle',
+      enabledHint:
+        'Every printer: on from the moment it takes a job, through printing and pause, off after the print. Switching the light from Bambuddy during a print leaves it as you set it until that print ends.',
+      obicoForce: 'Always on while Obico checks',
+      obicoForceHint:
+        'Printers the Obico detection monitors keep the light on during the print even if it is switched off by hand, since the detector cannot see in the dark. Works with or without the switch above.',
+      offDelay: 'Off after (seconds)',
+      offDelayHint: 'Wait this long after a print before switching off, so a queue sending the next job does not blink the light.',
+      keepCamera: 'Keep the camera connected',
+      keepCameraHint:
+        'Some A1s switch the light off whenever a camera connection closes, so the short connections of the Obico check make it flash (on about 2 s, off about 7 s) whatever the light is set to. For the printers ticked here the camera stays connected for as long as the light is held, as if the live view were open; the Obico check and snapshots use its pictures. Each one keeps streaming (roughly 150–300 KB/s), so tick only the printers that flash. A1/P1 built-in cameras only.',
+      keepCameraCount: '{{count}} selected',
+      keepCameraFilter: 'Filter by name or model',
+      ruleVerify:
+        'The reported light state is checked before every switch. If it already reads as wanted it is not trusted (many A1s report the light on after power-up while it is dark): the opposite command is sent first, then the wanted one.',
+      ruleManual:
+        'Switching the light from Bambu Handy or the printer screen during a print is undone within about 15 seconds. Switching it from Bambuddy after a print is left alone.',
+      ruleCamera:
+        'A camera still in use when the print ends (a live view, the finish photo) keeps the light until it is let go.',
+      ruleIdle:
+        'Idle printers are left to "Turn on chamber light for camera" in Settings. Set it to Off if snapshots of idle printers (camera wall, Home Assistant) should not switch the light on.',
+      save: 'Save',
+      saved: 'Saved.',
+      saveFailed: 'Could not save.',
+    },
     obicoScheduler: {
       title: 'AI Detection',
       description:
@@ -1348,6 +1377,30 @@ const HYYZ17200_LOCALES: Record<string, ResourceLanguage> = {
         saved: '已保存。',
         saveFailed: '保存失败。',
       },
+    },
+    cameraLed: {
+      title: '自动相机 LED 控制',
+      description:
+        '打印全程保持舱灯开启，打印机空闲后关闭。摄像头始终有稳定的光照，不会每拍一张就开关一次（A1 的摄像头开灯后要好几秒才能调好曝光），任务之间 LED 也不会一直亮着。',
+      enabled: '打印时开启，空闲后关闭',
+      enabledHint: '所有打印机：从接到任务起，打印和暂停期间都开着，打印结束后关闭。打印中在 Bambuddy 里手动开关灯后，这一单都按你设的来。',
+      obicoForce: 'Obico 检测时强制开启',
+      obicoForceHint: 'Obico 正在检测的打印机，打印期间即使被手动关灯也会重新打开，因为检测看不清暗的画面。上面的开关开不开都有效。',
+      offDelay: '结束后延迟关闭（秒）',
+      offDelayHint: '打印结束后等这么久再关灯，避免队列紧接着派下一单时灯闪一下。',
+      keepCamera: '常开摄像头连接',
+      keepCameraHint:
+        '部分 A1 每次摄像头连接断开时都会把灯关掉，所以 Obico 检测的短连接会让灯闪（亮约 2 秒、灭约 7 秒），怎么开关灯都没用。勾选的打印机在灯由本功能接管期间一直保持摄像头连接，就像开着实时画面；Obico 检测和拍照直接用这路画面。每台会持续传输画面（约 150–300 KB/s），只勾会闪的机器。仅支持 A1/P1 的内置摄像头。',
+      keepCameraCount: '已选 {{count}} 台',
+      keepCameraFilter: '按名称或机型筛选',
+      ruleVerify:
+        '每次开关灯前先读打印机报告的灯状态。和目标相反就直接发一次；和目标相同则不信任它（很多 A1 开机后显示灯开着，实际没亮），先发一次反操作，再发目标操作。',
+      ruleManual: '打印中在 Bambu Handy 或打印机屏幕上关灯，约 15 秒内会重新打开。打印结束后在 Bambuddy 里开关灯，不会被改回。',
+      ruleCamera: '打印结束时摄像头仍在使用（实时画面、完成照片）的，等摄像头用完再关灯。',
+      ruleIdle: '空闲的打印机仍由“设置”里的“使用摄像头时打开腔室灯”决定。不希望拍空闲打印机（摄像头墙、Home Assistant）时开灯，就把它设为“关闭”。',
+      save: '保存',
+      saved: '已保存。',
+      saveFailed: '保存失败。',
     },
     obicoScheduler: {
       title: 'AI 检测调度',
