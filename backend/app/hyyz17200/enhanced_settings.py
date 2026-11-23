@@ -17,7 +17,7 @@ from collections.abc import Callable
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.hyyz17200 import auto_unload, camera_frames, sd_reuse, slot_preference
+from backend.app.hyyz17200 import auto_unload, camera_frames, obico_scheduler, sd_reuse, slot_preference
 from backend.app.hyyz17200.maintenance_jobs import MaintenanceSettings
 from backend.app.hyyz17200.models.setting import Hyyz17200Setting
 from backend.app.hyyz17200.quick_buttons import QuickButtonSettings
@@ -37,6 +37,7 @@ SECTIONS: dict[str, type[BaseModel]] = {
     "tab_title": TabTitleSettings,
     "sd_reuse": sd_reuse.SdReuseSettings,
     "quick_buttons": QuickButtonSettings,
+    "obico": obico_scheduler.ObicoSchedulerSettings,
 }
 
 APPLY: dict[str, Callable[[BaseModel], None]] = {
@@ -44,6 +45,7 @@ APPLY: dict[str, Callable[[BaseModel], None]] = {
     "auto_unload": auto_unload.apply_settings,
     "slot_preference": slot_preference.apply_settings,
     "sd_reuse": sd_reuse.apply_settings,
+    "obico": obico_scheduler.apply_settings,
 }
 
 
