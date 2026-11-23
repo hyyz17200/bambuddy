@@ -8,6 +8,7 @@ import {
   HardDrive,
   Layers,
   LayoutGrid,
+  Lightbulb,
   MousePointerClick,
   Palette,
   Repeat,
@@ -16,6 +17,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { AutoUnloadSection } from './AutoUnloadSection';
+import { CameraLedSection } from './cameraLed/CameraLedSection';
 import { CamWallSection } from './CamWallSection';
 import { HiddenFaultsSection } from './HiddenFaultsSection';
 import { MaintenanceSection } from './maintenanceJob/MaintenanceSection';
@@ -50,5 +52,6 @@ export const enhancedSettingsSections: {
   { id: 'plate-clear', icon: ClipboardCheck, titleKey: 'hyyz17200.plateClear.title', Component: PlateClearSection },
   { id: 'plate-count', icon: Layers, titleKey: 'hyyz17200.plateCount.settings.title', Component: PlateCountSection },
   { id: 'sd-reuse', icon: HardDrive, titleKey: 'hyyz17200.sdReuse.title', Component: SdReuseSection },
+  { id: 'camera-led', icon: Lightbulb, titleKey: 'hyyz17200.cameraLed.title', Component: CameraLedSection },
   { id: 'ai-detection', icon: ScanEye, titleKey: 'hyyz17200.obicoScheduler.title', Component: ObicoSchedulerSection },
 ];
