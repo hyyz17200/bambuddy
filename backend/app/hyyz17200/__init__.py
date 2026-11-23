@@ -11,9 +11,17 @@ from backend.app.hyyz17200.api import router
 def register(app: FastAPI) -> None:
     """Add the fork's routes and background work. Called from main.py with the
     upstream routers, after the app (and its lifespan) is built."""
-    from backend.app.hyyz17200 import maintenance_jobs, printer_import, sd_reuse, slice_as_designed, slot_preference
+    from backend.app.hyyz17200 import (
+        maintenance_jobs,
+        obico_scheduler,
+        printer_import,
+        sd_reuse,
+        slice_as_designed,
+        slot_preference,
+    )
 
     app.include_router(router, prefix=settings.api_prefix)
+    obico_scheduler.install()
     slice_as_designed.install()
     printer_import.install()
     maintenance_jobs.install()

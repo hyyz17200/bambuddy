@@ -28,6 +28,7 @@ from backend.app.hyyz17200 import (
     camera_frames,
     enhanced_settings,
     maintenance_jobs,
+    obico_scheduler,
     plate_count,
     printer_import,
     printer_intake,
@@ -235,6 +236,25 @@ async def get_auto_unload_status(
         if scope.allows(pid)
     ]
     return {"enabled": seen["enabled"], "idle_minutes": seen["idle_minutes"], "printers": printers}
+
+
+@router.get("/obico/scheduler")
+async def get_obico_scheduler(
+    db: AsyncSession = Depends(get_db, scope="function"),
+    # The same as upstream's /obico/status, whose per-printer numbers these extend.
+    _: User | None = RequirePermissionIfAuthEnabled(Permission.SETTINGS_READ),
+    scope: PrinterScope = RequestPrinterScope,
+):
+    """How the Obico checks are being scheduled: per printer the caller may see,
+    how often it is checked and how long capture and the ML request take."""
+    scheduler = obico_scheduler.scheduler
+    if scheduler is None:
+        raise HTTPException(status_code=503, detail="not_installed")
+    seen = scheduler.snapshot(scope.allows)
+    names = dict((await db.execute(select(Printer.id, Printer.name))).all())
+    printers = [{"printer_id": pid, "name": names.get(pid), **row} for pid, row in seen.pop("printers").items()]
+    printers.sort(key=lambda row: (row["name"] or "", row["printer_id"]))
+    return {**seen, "printers": printers}
 
 
 @router.put("/printers/{printer_id}/intake", response_model=IntakeUpdate)

@@ -11,6 +11,7 @@ import {
   MousePointerClick,
   Palette,
   Repeat,
+  ScanEye,
   Undo2,
   type LucideIcon,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ import { AutoUnloadSection } from './AutoUnloadSection';
 import { CamWallSection } from './CamWallSection';
 import { HiddenFaultsSection } from './HiddenFaultsSection';
 import { MaintenanceSection } from './maintenanceJob/MaintenanceSection';
+import { ObicoSchedulerSection } from './obicoScheduler/ObicoSchedulerSection';
 import { PlateClearSection } from './PlateClearSection';
 import { PlateCountSection } from './plateCount/PlateCountSection';
 import { QuickButtonsSection } from './quickButtons/QuickButtonsSection';
@@ -48,4 +50,5 @@ export const enhancedSettingsSections: {
   { id: 'plate-clear', icon: ClipboardCheck, titleKey: 'hyyz17200.plateClear.title', Component: PlateClearSection },
   { id: 'plate-count', icon: Layers, titleKey: 'hyyz17200.plateCount.settings.title', Component: PlateCountSection },
   { id: 'sd-reuse', icon: HardDrive, titleKey: 'hyyz17200.sdReuse.title', Component: SdReuseSection },
+  { id: 'ai-detection', icon: ScanEye, titleKey: 'hyyz17200.obicoScheduler.title', Component: ObicoSchedulerSection },
 ];
