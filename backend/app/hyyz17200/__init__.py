@@ -12,6 +12,7 @@ def register(app: FastAPI) -> None:
     """Add the fork's routes and background work. Called from main.py with the
     upstream routers, after the app (and its lifespan) is built."""
     from backend.app.hyyz17200 import (
+        camera_led,
         maintenance_jobs,
         obico_scheduler,
         printer_import,
@@ -27,6 +28,7 @@ def register(app: FastAPI) -> None:
     maintenance_jobs.install()
     slot_preference.install()
     sd_reuse.install()
+    camera_led.install()
     _wrap_lifespan(app)
 
 
@@ -42,6 +44,7 @@ def _wrap_lifespan(app: FastAPI) -> None:
         from backend.app.hyyz17200 import (
             auto_unload,
             calibration_batch,
+            camera_led,
             printer_scan,
             slice_as_designed,
             slot_preference,
@@ -52,9 +55,11 @@ def _wrap_lifespan(app: FastAPI) -> None:
             await calibration_batch.resume_at_startup()
             auto_unload.runner.start()
             slot_preference.runner.start()
+            camera_led.runner.start()
             try:
                 yield state
             finally:
+                camera_led.runner.stop()
                 slot_preference.runner.stop()
                 auto_unload.runner.stop()
                 calibration_batch.runner.stop()
