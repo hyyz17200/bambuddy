@@ -511,6 +511,8 @@ class TestCaptureFrameSharesBroadcasterUpstream:
         mock_ctx.__aexit__ = AsyncMock(return_value=None)
 
         svc = ObicoDetectionService()
+        from backend.app.api.routes import camera as camera_routes
+
         with (
             patch("backend.app.services.obico_detection.async_session", return_value=mock_ctx),
             patch(
@@ -521,6 +523,9 @@ class TestCaptureFrameSharesBroadcasterUpstream:
                 "backend.app.api.routes.camera.try_get_active_buffered_frame",
                 return_value=FAKE_JPEG,
             ),
+            # hyyz17200: Obico takes the buffered frame only fresh and with its arrival.
+            patch.dict(camera_routes._last_frames, {1: FAKE_JPEG}),
+            patch.dict(camera_routes._last_frame_received, {1: (1, camera_routes._frame_clock())}),
             patch(
                 "backend.app.services.camera.capture_camera_frame_bytes",
                 new=AsyncMock(return_value=b"FRESH-CAPTURE-SHOULD-NOT-BE-USED"),

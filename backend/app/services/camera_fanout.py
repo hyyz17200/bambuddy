@@ -50,6 +50,25 @@ _DISCONNECT_POLL_SECONDS = 1.0
 UpstreamFactory = Callable[[asyncio.Event], AsyncGenerator[bytes, None]]
 
 
+def _deliver_upstream_gone(queue: asyncio.Queue[bytes]) -> None:
+    """Queue the end-of-stream sentinel even when the queue is full.
+
+    hyyz17200: a full queue used to drop the sentinel, leaving a subscriber
+    that is not reading fast enough (the camera hold, a stalled browser)
+    waiting forever for a stream that had ended. A frame is dropped to make
+    room: it is live video, and the stream is over anyway.
+    """
+    while True:
+        try:
+            queue.put_nowait(_UPSTREAM_GONE)
+            return
+        except asyncio.QueueFull:
+            try:
+                queue.get_nowait()
+            except asyncio.QueueEmpty:  # pragma: no cover — single-threaded loop
+                pass
+
+
 class MjpegBroadcaster:
     """Single upstream MJPEG stream, fanned out to N subscribers."""
 
@@ -189,10 +208,7 @@ class MjpegBroadcaster:
             self._upstream_disconnect.set()
             if notify_subscribers:
                 for queue in self._subscribers:
-                    try:
-                        queue.put_nowait(_UPSTREAM_GONE)
-                    except asyncio.QueueFull:
-                        pass
+                    _deliver_upstream_gone(queue)  # hyyz17200
                 self._subscribers.clear()
             pump_task = self._pump_task
             self._pump_task = None
@@ -249,11 +265,11 @@ class MjpegBroadcaster:
         finally:
             # Pump is exiting — wake up any subscribers still hanging on get().
             async with self._lock:
+                # hyyz17200: that session's picture is over; a subscriber who
+                # restarts the pump must not be primed with it as if it were live.
+                self._last_chunk = None
                 for queue in self._subscribers:
-                    try:
-                        queue.put_nowait(_UPSTREAM_GONE)
-                    except asyncio.QueueFull:
-                        pass
+                    _deliver_upstream_gone(queue)  # hyyz17200
 
 
 # Global registry. Keyed by printer_id (as str) so a chamber-mode printer

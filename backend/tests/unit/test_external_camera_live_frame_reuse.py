@@ -40,6 +40,7 @@ def _clean_registries():
             camera._active_streams.pop(sid, None)
         camera._last_frames.pop(PRINTER_ID, None)
         camera._last_frame_times.pop(PRINTER_ID, None)
+        camera._last_frame_received.pop(PRINTER_ID, None)  # hyyz17200
         camera._stream_start_times.pop(PRINTER_ID, None)
 
     _purge()
@@ -51,7 +52,8 @@ def _attach_viewer(frame: bytes | None = LIVE_FRAME) -> None:
     """Register a live external stream, as the stream route does."""
     camera._active_streams[f"{PRINTER_ID}-ext-deadbeef"] = object()
     if frame is not None:
-        camera._last_frames[PRINTER_ID] = frame
+        # hyyz17200: as the stream does, with its arrival (Obico needs a fresh frame).
+        camera._buffer_frame(PRINTER_ID, frame)
 
 
 # ---------------------------------------------------------------------------

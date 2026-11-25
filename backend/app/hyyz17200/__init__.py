@@ -12,6 +12,7 @@ def register(app: FastAPI) -> None:
     """Add the fork's routes and background work. Called from main.py with the
     upstream routers, after the app (and its lifespan) is built."""
     from backend.app.hyyz17200 import (
+        camera_hold,
         camera_led,
         maintenance_jobs,
         obico_scheduler,
@@ -29,6 +30,7 @@ def register(app: FastAPI) -> None:
     slot_preference.install()
     sd_reuse.install()
     camera_led.install()
+    camera_hold.install()
     _wrap_lifespan(app)
 
 

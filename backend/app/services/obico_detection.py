@@ -123,9 +123,15 @@ class ObicoDetectionService:
         # Global detection event log (most-recent-first)
         self._history: deque = deque(maxlen=HISTORY_MAX)
         self._last_error: str | None = None
+        # hyyz17200: the live frames this service has checked, so a stalled
+        # camera's last frame is not sent to Obico again as a new sample.
+        from backend.app.services.failure_detection_camera import DetectionFrameGate
+
+        self._frame_gate = DetectionFrameGate()
 
     def forget_printer(self, printer_id: int) -> None:
         """A deleted printer's verdict and score, not the next printer's given its id."""
+        self._frame_gate.forget(printer_id)  # hyyz17200
         for state in (
             self._states,
             self._state_keys,
@@ -288,7 +294,10 @@ class ObicoDetectionService:
 
         try:
             return await capture_detection_frame(
-                printer_id, session_factory=async_session, timeout=SNAPSHOT_CAPTURE_TIMEOUT
+                printer_id,
+                session_factory=async_session,
+                timeout=SNAPSHOT_CAPTURE_TIMEOUT,
+                frame_gate=self._frame_gate,  # hyyz17200
             )
         except ValueError as e:
             self._last_error = str(e)

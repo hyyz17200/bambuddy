@@ -37,13 +37,19 @@ class FakeCamera:
     def __init__(self, monkeypatch):
         self.connections: list[tuple[asyncio.Queue, FakeWriter]] = []
         self.refuse = False
+        # Set to an unset event to hold a dial open (the A1 still connecting).
+        self.dialing: asyncio.Event | None = None
+        self.peak_open = 0
 
         async def connect(ip_address, access_code, fps=5):
+            if self.dialing is not None:
+                await self.dialing.wait()
             if self.refuse:
                 return None
             reader, writer = asyncio.Queue(), FakeWriter()
             reader.put_nowait(JPEG)
             self.connections.append((reader, writer))
+            self.peak_open = max(self.peak_open, len(self.open()))
             return reader, writer
 
         async def read(reader, timeout=10.0):
@@ -58,6 +64,10 @@ class FakeCamera:
     def drop(self):
         """The printer closes the stream."""
         self.connections[-1][0].put_nowait(None)
+
+    def send(self, frame: bytes = JPEG):
+        """The printer sends one more frame on the open connection."""
+        self.connections[-1][0].put_nowait(frame)
 
 
 def printer(pid=1, **kw):
@@ -194,6 +204,247 @@ class TestHolding:
         assert camera_hold.held_printer_ids() == set()
 
 
+class Clock:
+    def __init__(self, monkeypatch, start=1000.0):
+        self.now = start
+        monkeypatch.setattr(camera_routes, "_frame_clock", lambda: self.now)
+
+
+class _Session:
+    def __init__(self, printers):
+        self.printers = printers
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def get(self, _model, pid):
+        return self.printers.get(pid)
+
+
+OBICO_SETTINGS = {
+    "snapshot_base_url": "http://bambuddy",
+    "ml_url": "http://obico-ml",
+    "ml_token": None,
+    "sensitivity": "medium",
+    "action": "notify",
+}
+
+
+class Obico:
+    """A real Obico service; the ML API and the one-shot capture are counted fakes."""
+
+    def __init__(self, monkeypatch, printers, cam):
+        import httpx
+
+        from backend.app.services import camera as camera_service, obico_detection
+
+        camera_hold.install()
+        self.ml_calls = 0
+        self.one_shots = 0
+        obico = self
+
+        class Client:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *exc):
+                return False
+
+            async def get(self, url, params=None, headers=None):
+                obico.ml_calls += 1
+                return httpx.Response(200, json={"detections": []}, request=httpx.Request("GET", url))
+
+        async def one_shot(**_kwargs):
+            # A capture of its own is another connection to the camera.
+            obico.one_shots += 1
+            cam.peak_open = max(cam.peak_open, len(cam.open()) + 1)
+            return b"\xff\xd8 one-shot \xff\xd9"
+
+        monkeypatch.setattr(obico_detection.httpx, "AsyncClient", Client)
+        monkeypatch.setattr(obico_detection, "async_session", lambda: _Session(printers))
+        monkeypatch.setattr(camera_service, "capture_camera_frame_bytes", one_shot)
+        self.svc = obico_detection.ObicoDetectionService()
+
+    async def check(self, pid=1):
+        status = SimpleNamespace(task_name="job", subtask_name="job", subtask_id="42")
+        await self.svc._check_printer(pid, status, dict(OBICO_SETTINGS))
+
+    def samples(self, pid=1) -> int:
+        state = self.svc._states.get(pid)
+        return state.frame_count if state is not None else 0
+
+    def counts(self, pid=1) -> tuple[int, int, int]:
+        """ML calls, valid samples, own camera connections."""
+        return self.ml_calls, self.samples(pid), self.one_shots
+
+
+async def received_at(pid, when):
+    await until(lambda: (camera_routes._last_frame_received.get(pid) or (0, None))[1] == when)
+
+
+class TestObicoOnTheHeldCamera:
+    @pytest.mark.asyncio
+    async def test_a_stalled_camera_is_not_checked_again(self, cam, fresh, monkeypatch):
+        clock = Clock(monkeypatch)
+        obico = Obico(monkeypatch, fresh, cam)
+        camera_hold.hold({1})
+        await until(lambda: camera_hold.state(1) == "streaming")
+
+        await obico.check()
+        assert obico.counts() == (1, 1, 0)
+
+        # The same frame again within 3 s: checked already.
+        clock.now += 1.0
+        await obico.check()
+        assert obico.counts() == (1, 1, 0)
+        assert "Failed to capture snapshot" in obico.svc._errors[1]
+
+        # The A1 stops sending but keeps the connection: 15 s and 30 s later.
+        for _ in range(2):
+            clock.now += 14.5
+            await obico.check()
+        assert obico.counts() == (1, 1, 0)
+        assert camera_routes.is_stream_active(1)
+
+        # Frames come again: the first one is checked.
+        cam.send()
+        await received_at(1, clock.now)
+        await obico.check()
+        assert obico.counts() == (2, 2, 0)
+        assert 1 not in obico.svc._errors
+
+        # The same bytes arriving again are another sample.
+        clock.now += 2.0
+        cam.send(JPEG)
+        await received_at(1, clock.now)
+        await obico.check()
+        assert obico.counts() == (3, 3, 0)
+
+        # A frame nobody checked, past 3 s: skipped all the same.
+        clock.now += 1.0
+        cam.send()
+        await received_at(1, clock.now)
+        clock.now += 3.5
+        await obico.check()
+        assert obico.counts() == (3, 3, 0)
+        assert len(cam.connections) == 1
+
+    @pytest.mark.asyncio
+    async def test_the_check_waits_for_the_hold_to_reconnect(self, cam, fresh, monkeypatch):
+        clock = Clock(monkeypatch)
+        obico = Obico(monkeypatch, fresh, cam)
+        retry = asyncio.Event()
+        real_sleep = asyncio.sleep
+
+        async def sleep(_seconds):
+            await retry.wait()
+            retry.clear()
+
+        monkeypatch.setattr(camera_hold, "_sleep", sleep)
+        camera_hold.hold({1})
+        await until(lambda: camera_hold.state(1) == "streaming")
+        await obico.check()
+        assert obico.counts() == (1, 1, 0)
+
+        # The printer drops the camera; the hold waits to retry.
+        cam.drop()
+        await until(lambda: camera_hold.state(1) == "retrying")
+        assert not camera_routes.is_stream_active(1)
+        clock.now += 15
+        await obico.check()
+        assert obico.counts() == (1, 1, 0)
+
+        # It redials, and the A1 has not answered yet.
+        cam.dialing = asyncio.Event()
+        retry.set()
+        await until(lambda: camera_hold.state(1) == "connecting")
+        await real_sleep(0.05)
+        assert not camera_routes.is_stream_active(1)
+        clock.now += 15
+        await obico.check()
+        assert obico.counts() == (1, 1, 0)
+
+        # Connected: its first frame resumes the checks.
+        cam.dialing.set()
+        await until(lambda: camera_hold.state(1) == "streaming")
+        await obico.check()
+        assert obico.counts() == (2, 2, 0)
+        assert len(cam.connections) == 2
+        assert cam.peak_open == 1
+
+    @pytest.mark.asyncio
+    async def test_a_viewer_still_dialing_is_not_competed_with(self, cam, fresh, monkeypatch):
+        Clock(monkeypatch)
+        obico = Obico(monkeypatch, fresh, cam)
+        cam.dialing = asyncio.Event()
+
+        def factory(event):
+            return camera_routes.generate_chamber_mjpeg_stream(
+                ip_address="10.0.0.1",
+                access_code="12345678",
+                model="A1",
+                stream_id=camera_routes._new_fanout_stream_id(1),
+                disconnect_event=event,
+                printer_id=1,
+            )
+
+        viewer = await camera_fanout.get_or_create_broadcaster("printer-1", factory)
+        queue = await viewer.subscribe()
+        await asyncio.sleep(0.05)
+        assert not camera_routes.is_stream_active(1)
+        await obico.check()
+        assert obico.counts() == (0, 0, 0)
+
+        cam.dialing.set()
+        await until(lambda: camera_routes.is_stream_active(1) and 1 in camera_routes._last_frames)
+        await obico.check()
+        assert obico.counts() == (1, 1, 0)
+        assert cam.peak_open == 1
+        await viewer.unsubscribe(queue)
+
+    @pytest.mark.asyncio
+    async def test_without_a_live_camera_it_captures_as_before(self, cam, fresh, monkeypatch):
+        Clock(monkeypatch)
+        obico = Obico(monkeypatch, fresh, cam)
+        await obico.check()
+        await obico.check()
+        assert obico.counts() == (2, 2, 2)
+
+    @pytest.mark.asyncio
+    async def test_the_limits_are_the_obico_checks_own(self, cam, fresh, monkeypatch):
+        from backend.app.services.failure_detection_camera import DetectionFrameGate, capture_detection_frame
+
+        clock = Clock(monkeypatch)
+        obico = Obico(monkeypatch, fresh, cam)
+        camera_hold.hold({1})
+        await until(lambda: camera_hold.state(1) == "streaming")
+        await obico.check()
+        assert obico.counts() == (1, 1, 0)
+
+        def session():
+            return _Session(fresh)
+
+        # Another provider keeps its own record: Obico's read does not hide the frame.
+        other = DetectionFrameGate()
+        assert await capture_detection_frame(1, session_factory=session, frame_gate=other) == JPEG
+        assert await capture_detection_frame(1, session_factory=session, frame_gate=other) is None
+        # Callers without one (OctoEverywhere, snapshots) get the buffer as before, however old.
+        clock.now += 60
+        assert await capture_detection_frame(1, session_factory=session) == JPEG
+        assert camera_routes.live_frame_for_capture(1) == (True, JPEG)
+        assert obico.one_shots == 0
+
+        # A deleted printer's record goes with it.
+        obico.svc.forget_printer(1)
+        assert 1 not in obico.svc._frame_gate._used
+
+
 class TestUpstreamContracts:
     def test_the_live_view_uses_the_same_upstream(self):
         source = inspect.getsource(camera_routes.camera_stream)
@@ -208,6 +459,14 @@ class TestUpstreamContracts:
         from backend.app.services import failure_detection_camera
 
         assert "is_stream_active(printer_id)" in inspect.getsource(failure_detection_camera.capture_detection_frame)
+
+    def test_the_obico_check_uses_its_own_frame_record(self):
+        from backend.app import hyyz17200
+        from backend.app.services import obico_detection
+
+        source = inspect.getsource(obico_detection.ObicoDetectionService._capture_frame)
+        assert "frame_gate=self._frame_gate" in source
+        assert "camera_hold.install()" in inspect.getsource(hyyz17200.register)
         assert "live_frame_for_capture(printer_id)" in inspect.getsource(camera_routes._snapshot_response)
 
     def test_stop_keeps_a_watched_upstream(self):

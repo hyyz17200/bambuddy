@@ -84,6 +84,20 @@ def release_all() -> None:
         release(printer_id)
 
 
+def install() -> None:
+    """Tell the AI check's frame path that a held camera is taken, also while
+    the hold waits to reconnect: it must wait for the hold's next frame instead
+    of opening a connection of its own."""
+    from backend.app.services import failure_detection_camera
+
+    failure_detection_camera.register_camera_claim(is_held)
+
+
+def is_held(printer_id: int) -> bool:
+    task = _holds.get(printer_id)
+    return task is not None and not task.done()
+
+
 async def _load(printer_id: int):
     from backend.app.models.printer import Printer
 

@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import hashlib
+import itertools
 import logging
 import os
 import re
@@ -12,7 +13,7 @@ import time
 import uuid
 import zlib
 from collections.abc import AsyncGenerator
-from typing import Annotated
+from typing import Annotated, NamedTuple
 
 import anyio.lowlevel
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
@@ -118,6 +119,29 @@ _last_frames: dict[int, bytes] = {}
 
 # Track last frame timestamp for each printer (for stall detection)
 _last_frame_times: dict[int, float] = {}
+
+# hyyz17200: when each buffered frame actually arrived from the camera
+# (monotonic) and a number unique to that arrival. The AI check reuses only a
+# fresh frame it has not used before; two identical JPEGs that both arrived
+# are two samples, so the identity is the arrival, not the bytes.
+_last_frame_received: dict[int, tuple[int, float]] = {}
+_frame_seq = itertools.count(1)
+_frame_clock = time.monotonic  # tests replace it
+
+
+class LiveFrameSample(NamedTuple):
+    """hyyz17200: a buffered live frame and when it arrived."""
+
+    frame: bytes
+    seq: int | None
+    received_at: float | None
+
+
+def _buffer_frame(printer_id: int, frame: bytes) -> None:
+    """hyyz17200: store a frame just received from the camera, with its arrival."""
+    _last_frames[printer_id] = frame
+    _last_frame_received[printer_id] = (next(_frame_seq), _frame_clock())
+
 
 # Track stream start times for each printer
 _stream_start_times: dict[int, float] = {}
@@ -281,7 +305,7 @@ async def generate_chamber_mjpeg_stream(
 
             # Save frame to buffer for photo capture and track timestamp
             if printer_id is not None:
-                _last_frames[printer_id] = frame
+                _buffer_frame(printer_id, frame)  # hyyz17200
                 _last_frame_times[printer_id] = time.time()
 
             # Rate limiting - skip frames if needed to maintain target FPS
@@ -362,6 +386,32 @@ def live_frame_for_capture(printer_id: int) -> tuple[bool, bytes | None]:
     return True, _last_frames.get(printer_id)
 
 
+def live_frame_sample(printer_id: int) -> tuple[bool, LiveFrameSample | None]:
+    """hyyz17200: ``live_frame_for_capture`` with when the frame arrived.
+
+    ``seq`` and ``received_at`` are None for a frame stored without them.
+    """
+    defer, frame = live_frame_for_capture(printer_id)
+    if frame is None:
+        return defer, None
+    received = _last_frame_received.get(printer_id)
+    if received is None:
+        return defer, LiveFrameSample(frame, None, None)
+    return defer, LiveFrameSample(frame, received[0], received[1])
+
+
+def shared_camera_busy(printer_id: int) -> bool:
+    """hyyz17200: the printer's camera belongs to a live upstream.
+
+    A registered stream, or a fan-out broadcaster with subscribers whose
+    upstream may still be dialing the camera (it registers only once
+    connected). Another connection would compete with it.
+    """
+    if is_stream_active(printer_id):
+        return True
+    return any(get_subscriber_count(key) > 0 for key in _printer_broadcaster_keys(printer_id))
+
+
 def _release_printer_frame_state(printer_id: int | None) -> None:
     """Drop a printer's buffered frame and timings — unless a stream still owns them.
 
@@ -383,6 +433,7 @@ def _release_printer_frame_state(printer_id: int | None) -> None:
         return
     _last_frames.pop(printer_id, None)
     _last_frame_times.pop(printer_id, None)
+    _last_frame_received.pop(printer_id, None)  # hyyz17200
     _stream_start_times.pop(printer_id, None)
 
 
@@ -901,7 +952,7 @@ async def generate_rtsp_mjpeg_stream(
                             identical_frames += 1
 
                         if printer_id is not None:
-                            _last_frames[printer_id] = frame
+                            _buffer_frame(printer_id, frame)  # hyyz17200
                             _last_frame_times[printer_id] = now
                             if stream_id:
                                 _stream_last_frame_times[stream_id] = now
@@ -1179,7 +1230,7 @@ async def _external_upstream(
         still holds the camera, and a snapshot gets its frame.
         """
         if not disconnect_event.is_set():
-            _last_frames[printer_id] = frame
+            _buffer_frame(printer_id, frame)  # hyyz17200
 
     try:
         async with contextlib.aclosing(
@@ -1511,6 +1562,7 @@ async def forget_printer(printer_id: int) -> None:
             event.set()
     _last_frames.pop(printer_id, None)
     _last_frame_times.pop(printer_id, None)
+    _last_frame_received.pop(printer_id, None)  # hyyz17200
     _stream_start_times.pop(printer_id, None)
     _active_external_streams.pop(printer_id, None)
     _external_live_readers.pop(printer_id, None)

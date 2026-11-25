@@ -639,3 +639,93 @@ class TestRetireBroadcasters:
         await camera_fanout.retire_broadcasters("printer-9-ext-", keep="printer-9-ext-new")
 
         assert not kept.stopped and not other.stopped
+
+
+# ---------------------------------------------------------------------------
+# hyyz17200: the end of a stream reaches a subscriber whose queue is full
+# ---------------------------------------------------------------------------
+
+
+async def _fill_then_end(bc: MjpegBroadcaster, *, end: asyncio.Event) -> asyncio.Queue[bytes]:
+    """Subscribe, never read until the queue is full, then let the upstream end."""
+    queue = await bc.subscribe()
+    pump = bc._pump_task
+    await asyncio.wait_for(_until_full(queue), timeout=1.0)
+    end.set()
+    await asyncio.wait_for(asyncio.shield(pump), timeout=1.0)
+    return queue
+
+
+async def _until_full(queue: asyncio.Queue[bytes]) -> None:
+    while not queue.full():
+        await asyncio.sleep(0.001)
+
+
+def _frames_until(end: asyncio.Event, frames: int):
+    async def factory(disconnect: asyncio.Event) -> AsyncGenerator[bytes, None]:
+        for i in range(frames):
+            yield b"frame-%d" % i
+        # A camera that keeps the socket open until told otherwise.
+        while not end.is_set() and not disconnect.is_set():
+            await asyncio.sleep(0.005)
+
+    return factory
+
+
+async def _drain(bc: MjpegBroadcaster, queue: asyncio.Queue[bytes]) -> list[bytes]:
+    return [chunk async for chunk in iter_subscriber(bc, queue)]
+
+
+async def test_natural_end_reaches_a_full_queue():
+    end = asyncio.Event()
+    bc = MjpegBroadcaster("p1", _frames_until(end, camera_fanout._SUBSCRIBER_QUEUE_SIZE + 3))
+    queue = await _fill_then_end(bc, end=end)
+
+    received = await asyncio.wait_for(_drain(bc, queue), timeout=1.0)
+
+    # One frame made room for the sentinel; the subscriber ended.
+    assert len(received) == camera_fanout._SUBSCRIBER_QUEUE_SIZE - 1
+    assert bc.subscriber_count == 0
+
+
+async def test_force_shutdown_reaches_a_full_queue():
+    end = asyncio.Event()
+    bc = MjpegBroadcaster("p1", _frames_until(end, camera_fanout._SUBSCRIBER_QUEUE_SIZE + 3))
+    queue = await bc.subscribe()
+    await asyncio.wait_for(_until_full(queue), timeout=1.0)
+
+    await bc.force_shutdown()
+
+    received = await asyncio.wait_for(_drain(bc, queue), timeout=1.0)
+    assert len(received) == camera_fanout._SUBSCRIBER_QUEUE_SIZE - 1
+    end.set()
+
+
+async def test_a_new_session_is_not_primed_with_the_last_ones_frame():
+    """A subscriber that restarts an ended upstream (the camera hold retrying
+    within the grace window) must not take the old picture for a live one."""
+    sessions: list[asyncio.Event] = []
+
+    async def factory(disconnect: asyncio.Event) -> AsyncGenerator[bytes, None]:
+        end = asyncio.Event()
+        sessions.append(end)
+        if len(sessions) == 1:
+            yield b"old"
+            return  # the printer drops the stream
+        await end.wait()  # the new connection has not sent anything yet
+        yield b"new"
+
+    bc = MjpegBroadcaster("p1", factory)
+    first = await bc.subscribe()
+    assert await asyncio.wait_for(_drain(bc, first), timeout=1.0) == [b"old"]
+
+    # Rejoin within the grace window: same broadcaster, a new upstream session.
+    assert not bc.stopped
+    second = await bc.subscribe()
+    await asyncio.sleep(0.02)
+    assert len(sessions) == 2
+    assert second.empty()
+
+    sessions[1].set()
+    assert await asyncio.wait_for(second.get(), timeout=1.0) == b"new"
+    await bc.force_shutdown()
